@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ script['name'] }}{% endblock %}
+{% block content %}
+<div class="row-between">
+    <h1>{{ script['name'] }} <span class="tag">{{ script['type'] }}</span></h1>
+    <a href="{{ url_for('dashboard') }}" class="btn-ghost">← Back</a>
+</div>
+
+<div class="card">
+    <div class="row-between">
+        <div id="status">
+            {% if status.running %}
+                <span class="badge badge-on">● Running</span>
+                <span class="muted small">PID {{ status.pid }} · Uptime {{ status.uptime }}s · {{ status.memory_mb }}MB RAM</span>
+            {% else %}
+                <span class="badge badge-off">● Stopped</span>
+            {% endif %}
+        </div>
+        <div class="actions">
+            {% if status.running %}
+                <form method="post" action="{{ url_for('script_stop', sid=script['id']) }}" style="display:inline">
+                    <button class="btn-danger">Stop</button>
+                </form>
+                <form method="post" action="{{ url_for('script_restart', sid=script['id']) }}" style="display:inline">
+                    <button class="btn-secondary">Restart</button>
+                </form>
+            {% else %}
+                <form method="post" action="{{ url_for('script_start', sid=script['id']) }}" style="display:inline">
+                    <button class="btn-primary">Start</button>
+                </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('script_delete', sid=script['id']) }}" style="display:inline"
+                  onsubmit="return confirm('Delete this script and all its files?')">
+                <button class="btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="row-between">
+        <h2>Live Log</h2>
+        <div>
+            <label class="switch"><input type="checkbox" id="autoscroll" checked> Auto-scroll</label>
+            <a href="{{ url_for('script_logs_download', sid=script['id']) }}" class="btn-ghost">Download</a>
+        </div>
+    </div>
+    <pre id="log" class="log-box">Loading…</pre>
+</div>
+
+<script>
+const sid = {{ script['id'] }};
+const logEl = document.getElementById('log');
+const autoscroll = document.getElementById('autoscroll');
+
+async function refresh() {
+    try {
+        const r = await fetch(`/script/${sid}/logs`);
+        const j = await r.json();
+        logEl.textContent = j.log || '(empty)';
+        if (autoscroll.checked) logEl.scrollTop = logEl.scrollHeight;
+        // Update status badge
+        const s = document.getElementById('status');
+        if (j.status.running) {
+            s.innerHTML = `<span class="badge badge-on">● Running</span> <span class="muted small">PID ${j.status.pid} · Uptime ${j.status.uptime}s · ${j.status.memory_mb}MB RAM</span>`;
+        } else {
+            s.innerHTML = `<span class="badge badge-off">● Stopped</span>`;
+        }
+    } catch (e) {}
+}
+setInterval(refresh, 2000);
+refresh();
+</script>
+{% endblock %}

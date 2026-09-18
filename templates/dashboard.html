@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Your Scripts <span class="muted">({{ count }}/{{ user['file_limit'] }})</span></h1>
+
+<div class="card">
+    <h2>Upload New</h2>
+    <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="upload-form">
+        <input type="file" name="file" accept=".py,.js,.zip" required>
+        <button class="btn-primary">Upload</button>
+    </form>
+    <p class="muted small">.py · .js · .zip  •  max 20MB</p>
+</div>
+
+{% if scripts %}
+    <div class="grid">
+    {% for item in scripts %}
+        {% set s = item.script %}
+        {% set st = item.status %}
+        <div class="card script-card">
+            <div class="row-between">
+                <h3>{{ s['name'] }} <span class="tag">{{ s['type'] }}</span></h3>
+                {% if st.running %}
+                    <span class="badge badge-on">● Running</span>
+                {% else %}
+                    <span class="badge badge-off">● Stopped</span>
+                {% endif %}
+            </div>
+            {% if st.running %}
+                <p class="muted small">PID {{ st.pid }} · {{ st.uptime }}s · {{ st.memory_mb }}MB</p>
+            {% endif %}
+            <a class="btn-secondary" href="{{ url_for('script_detail', sid=s['id']) }}">Open →</a>
+        </div>
+    {% endfor %}
+    </div>
+{% else %}
+    <div class="card empty">No scripts yet. Upload one above.</div>
+{% endif %}
+{% endblock %}

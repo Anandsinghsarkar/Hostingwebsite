@@ -1,0 +1,144 @@
+:root {
+    --bg: #0f1117;
+    --bg2: #161923;
+    --panel: #1b1f2b;
+    --border: #2a2f3d;
+    --text: #e6e9f0;
+    --muted: #8892a6;
+    --primary: #5b7cfa;
+    --primary-h: #4a68e0;
+    --danger: #ef4444;
+    --success: #22c55e;
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+}
+
+nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky; top: 0; z-index: 10;
+}
+.brand { font-weight: 700; font-size: 18px; }
+nav .links { display: flex; gap: 16px; align-items: center; }
+nav a { color: var(--text); text-decoration: none; }
+nav a:hover { color: var(--primary); }
+.who { color: var(--muted); font-size: 14px; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+h1 { margin: 0 0 20px; font-size: 26px; }
+h2 { margin: 0 0 14px; font-size: 18px; color: var(--text); }
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.card.auth { max-width: 400px; margin: 60px auto; }
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.script-card h3 { margin: 0; font-size: 16px; word-break: break-all; }
+
+form label { display: block; margin-bottom: 12px; color: var(--muted); font-size: 14px; }
+form input[type=text], form input[type=password], form input[type=number], form input[type=file] {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    padding: 9px 16px;
+    font-weight: 500;
+    transition: all .15s;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-h); }
+.btn-secondary { background: var(--border); color: var(--text); }
+.btn-secondary:hover { background: #353b4b; }
+.btn-danger { background: var(--danger); color: white; }
+.btn-danger:hover { background: #d63c3c; }
+.btn-ghost { background: transparent; color: var(--text); padding: 6px 12px; }
+.btn-ghost:hover { background: var(--border); }
+button.small { padding: 5px 10px; font-size: 12px; }
+
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+.tag {
+    font-size: 11px;
+    background: var(--border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--muted);
+    font-weight: normal;
+    text-transform: uppercase;
+}
+
+.badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+.badge-on { background: rgba(34,197,94,.15); color: var(--success); }
+.badge-off { background: rgba(136,146,166,.15); color: var(--muted); }
+
+.flash { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+.flash-success { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.3); color: #86efac; }
+.flash-error { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+
+.log-box {
+    background: #0a0c12;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    max-height: 420px;
+    overflow: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #b9c2d4;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+}
+
+.upload-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.upload-form input[type=file] { flex: 1; min-width: 200px; margin: 0; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 13px; text-transform: uppercase; }
+
+.inline-form { display: flex; gap: 6px; align-items: center; }
+
+.switch { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.empty { text-align: center; color: var(--muted); padding: 40px; }
+
+a { color: var(--primary); }

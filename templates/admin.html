@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1>Admin Panel</h1>
+<div class="card">
+    <p><strong>Total running scripts:</strong> {{ total_running }}</p>
+</div>
+
+<div class="card">
+    <h2>Users</h2>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Username</th><th>Admin</th><th>Scripts</th><th>Running</th><th>Limit</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+        {% for item in users %}
+            {% set u = item.user %}
+            <tr>
+                <td>{{ u['id'] }}</td>
+                <td>{{ u['username'] }}</td>
+                <td>{% if u['is_admin'] %}✅{% endif %}</td>
+                <td>{{ item.file_count }}</td>
+                <td>{{ item.running }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin_set_limit', uid=u['id']) }}" class="inline-form">
+                        <input name="limit" type="number" min="0" value="{{ u['file_limit'] }}" style="width:70px">
+                        <button class="btn-secondary small">Save</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" action="{{ url_for('admin_delete_user', uid=u['id']) }}"
+                          onsubmit="return confirm('Delete user {{ u['username'] }} and all their scripts?')">
+                        <button class="btn-danger small">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
