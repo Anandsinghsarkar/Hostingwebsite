@@ -2,185 +2,125 @@
 {% block title %}Admin Payments{% endblock %}
 
 {% block content %}
-<h1 class="page-title">💰 Payment &amp; Pricing Management</h1>
+<h1 class="page-title">💰 Payment &amp; Pricing</h1>
 
-<!-- ========== PRICING & QR SETTINGS ========== -->
+<!-- Pricing Settings -->
 <div class="card mb-3">
     <div class="card-header"><h3>⚙️ Pricing Settings</h3></div>
     <form method="post" action="{{ url_for('admin_update_pricing') }}" enctype="multipart/form-data">
 
-        <h4 style="margin: 12px 0 8px; color: var(--text-dim); font-size: 13px;">📱 PAYMENT INFO</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <h4 style="margin: 12px 0 8px; color: var(--text-dim); font-size: 12px; text-transform: uppercase;">📱 Payment Info</h4>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
             <div>
                 <label>UPI ID</label>
                 <input type="text" name="upi_id" value="{{ settings.upi_id }}" placeholder="example@upi">
             </div>
             <div>
                 <label>UPI Holder Name</label>
-                <input type="text" name="upi_name" value="{{ settings.upi_name }}" placeholder="A7 Hosting">
+                <input type="text" name="upi_name" value="{{ settings.upi_name }}">
+            </div>
+            <div>
+                <label>QR Code Image</label>
+                {% if settings.qr_code_url %}
+                    <div style="margin-bottom: 10px;">
+                        <img src="{{ settings.qr_code_url }}" style="max-width: 160px; border-radius: 10px; border: 1px solid var(--border);">
+                    </div>
+                {% endif %}
+                <input type="file" name="qr_image" accept="image/*">
             </div>
         </div>
 
-        <div style="margin-top: 12px;">
-            <label>QR Code Image</label>
-            {% if settings.qr_code_url %}
-                <div style="margin-bottom: 10px;">
-                    <img src="{{ settings.qr_code_url }}" style="max-width: 180px; border-radius: 10px; border: 1px solid var(--border);">
-                </div>
-            {% endif %}
-            <input type="file" name="qr_image" accept="image/*">
-            <small class="muted">Naya QR upload karne pe purana replace ho jayega.</small>
-        </div>
-
-        <h4 style="margin: 20px 0 8px; color: var(--text-dim); font-size: 13px;">💎 PLAN PRICING</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
-            <div>
-                <label>Free Plan - Bots</label>
-                <input type="number" name="free_bots" value="{{ settings.pricing.free.bots }}" min="0">
-            </div>
-            <div>
-                <label>Premium Price (₹)</label>
-                <input type="number" name="premium_price" value="{{ settings.pricing.premium.price }}" min="0">
-            </div>
-            <div>
-                <label>Premium Bots</label>
-                <input type="number" name="premium_bots" value="{{ settings.pricing.premium.bots }}" min="0">
-            </div>
-            <div>
-                <label>Premium Days</label>
-                <input type="number" name="premium_days" value="{{ settings.pricing.premium.days }}" min="1">
-            </div>
-            <div>
-                <label>Business Price (₹)</label>
-                <input type="number" name="business_price" value="{{ settings.pricing.business.price }}" min="0">
-            </div>
-            <div>
-                <label>Business Bots</label>
-                <input type="number" name="business_bots" value="{{ settings.pricing.business.bots }}" min="0">
-            </div>
-            <div>
-                <label>Business Days</label>
-                <input type="number" name="business_days" value="{{ settings.pricing.business.days }}" min="1">
-            </div>
-            <div>
-                <label>Per Extra Bot (₹)</label>
-                <input type="number" name="per_bot_price" value="{{ settings.per_bot_price }}" min="0">
-            </div>
-            <div>
-                <label>Free Price (₹) - usually 0</label>
-                <input type="number" name="free_price" value="{{ settings.pricing.free.price }}" min="0">
-            </div>
-        </div>
-
-        <h4 style="margin: 20px 0 8px; color: var(--text-dim); font-size: 13px;">📢 OFFER &amp; SUPPORT</h4>
+        <h4 style="margin: 20px 0 8px; color: var(--text-dim); font-size: 12px; text-transform: uppercase;">💎 Plan Pricing</h4>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-                <label>Offer Text</label>
-                <input type="text" name="offer_text" value="{{ settings.offer_text }}">
-            </div>
-            <div>
-                <label>Support Contact</label>
-                <input type="text" name="support_contact" value="{{ settings.support_contact }}">
-            </div>
-        </div>
-        <div style="margin-top: 12px;">
-            <label>Payment Note</label>
-            <textarea name="payment_note" rows="2">{{ settings.payment_note }}</textarea>
+            <div><label>Free Bots</label><input type="number" name="free_bots" value="{{ settings.pricing.free.bots }}"></div>
+            <div><label>Free Price (₹)</label><input type="number" name="free_price" value="{{ settings.pricing.free.price }}"></div>
+            <div><label>Premium Price (₹)</label><input type="number" name="premium_price" value="{{ settings.pricing.premium.price }}"></div>
+            <div><label>Premium Bots</label><input type="number" name="premium_bots" value="{{ settings.pricing.premium.bots }}"></div>
+            <div><label>Premium Days</label><input type="number" name="premium_days" value="{{ settings.pricing.premium.days }}"></div>
+            <div><label>Per Extra Bot (₹)</label><input type="number" name="per_bot_price" value="{{ settings.per_bot_price }}"></div>
+            <div><label>Business Price (₹)</label><input type="number" name="business_price" value="{{ settings.pricing.business.price }}"></div>
+            <div><label>Business Bots</label><input type="number" name="business_bots" value="{{ settings.pricing.business.bots }}"></div>
+            <div><label>Business Days</label><input type="number" name="business_days" value="{{ settings.pricing.business.days }}"></div>
         </div>
 
-        <button class="btn btn-primary" style="margin-top: 16px;">💾 Save Settings</button>
+        <h4 style="margin: 20px 0 8px; color: var(--text-dim); font-size: 12px; text-transform: uppercase;">📢 Offer &amp; Support</h4>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+            <div><label>Offer Text</label><input type="text" name="offer_text" value="{{ settings.offer_text }}"></div>
+            <div><label>Support Contact</label><input type="text" name="support_contact" value="{{ settings.support_contact }}"></div>
+            <div><label>Payment Note</label><textarea name="payment_note" rows="2">{{ settings.payment_note }}</textarea></div>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%; margin-top: 16px;">💾 Save Settings</button>
     </form>
 </div>
 
-<!-- ========== ADD PAYMENT ========== -->
+<!-- Add Payment -->
 <div class="card mb-3">
-    <div class="card-header"><h3>➕ Add Payment Manually</h3></div>
-    <form method="post" action="{{ url_for('admin_add_payment') }}" class="row" style="align-items:end;">
-        <div style="flex:2;min-width:180px;">
-            <label>User</label>
-            <select name="user_id" required>
-                <option value="">Select user...</option>
-                {% for uid, u in users.items() %}
-                    <option value="{{ uid }}">{{ u.name }} ({{ u.email }})</option>
-                {% endfor %}
-            </select>
+    <div class="card-header"><h3>➕ Add Payment</h3></div>
+    <form method="post" action="{{ url_for('admin_add_payment') }}">
+        <label>User</label>
+        <select name="user_id" required style="margin-bottom: 12px;">
+            <option value="">Select user...</option>
+            {% for uid, u in users.items() %}
+                <option value="{{ uid }}">{{ u.name }} ({{ u.email }})</option>
+            {% endfor %}
+        </select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div><label>Amount (₹)</label><input name="amount" type="number" step="0.01" required></div>
+            <div>
+                <label>Method</label>
+                <select name="method">
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                    <option value="paypal">PayPal</option>
+                    <option value="manual">Manual</option>
+                </select>
+            </div>
+            <div>
+                <label>Status</label>
+                <select name="status">
+                    <option value="success">Success</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div><label>Note</label><input name="note" type="text" placeholder="Optional"></div>
         </div>
-        <div style="flex:1;min-width:100px;">
-            <label>Amount (₹)</label>
-            <input name="amount" type="number" step="0.01" required>
-        </div>
-        <div style="flex:1;min-width:100px;">
-            <label>Method</label>
-            <select name="method">
-                <option value="upi">UPI</option>
-                <option value="card">Card</option>
-                <option value="paypal">PayPal</option>
-                <option value="manual">Manual</option>
-            </select>
-        </div>
-        <div style="flex:1;min-width:100px;">
-            <label>Status</label>
-            <select name="status">
-                <option value="success">Success</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-            </select>
-        </div>
-        <div style="flex:2;min-width:180px;">
-            <label>Note</label>
-            <input name="note" type="text" placeholder="Optional">
-        </div>
-        <button class="btn btn-primary">Add</button>
+        <button class="btn btn-primary" style="width: 100%; margin-top: 12px;">Add Payment</button>
     </form>
 </div>
 
-<!-- ========== ALL PAYMENTS ========== -->
+<!-- Payments List -->
 <div class="card">
     <div class="card-header"><h3>📊 All Payments</h3></div>
     {% if payments %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>User</th>
-                <th>Amount</th>
-                <th>Method</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for p in payments %}
-            <tr>
-                <td class="muted small">{{ p.created_at[:19] }}</td>
-                <td>
-                    {% if p.user_id in users %}
-                        <strong>{{ users[p.user_id].name }}</strong><br>
-                        <span class="muted small">{{ users[p.user_id].email }}</span>
-                    {% else %}
-                        <span class="muted">{{ p.user_id }}</span>
-                    {% endif %}
-                </td>
-                <td><strong>₹{{ '%.2f'|format(p.amount) }}</strong></td>
-                <td><span class="badge badge-off">{{ p.method }}</span></td>
-                <td>
-                    {% if p.status == 'success' %}<span class="badge badge-on">✅</span>
-                    {% elif p.status == 'pending' %}<span class="badge" style="background:rgba(251,191,36,.12);color:var(--gold);">⏳</span>
-                    {% else %}<span class="badge" style="background:rgba(239,68,68,.12);color:#fca5a5;">❌</span>{% endif %}
-                </td>
-                <td>
-                    <form method="post" action="{{ url_for('admin_payment_status', pid=p.id) }}" style="display:inline;">
-                        <select name="status" onchange="this.form.submit()" style="padding:4px 8px;font-size:11px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            {% for p in payments %}
+            <div style="padding: 12px; border: 1px solid var(--border); border-radius: 10px;">
+                <div class="row-between mb-2">
+                    <div style="flex:1;min-width:0;">
+                        {% if p.user_id in users %}
+                            <strong style="font-size: 13px;">{{ users[p.user_id].name }}</strong>
+                            <div class="muted small" style="word-break: break-all;">{{ users[p.user_id].email }}</div>
+                        {% else %}
+                            <span class="muted">{{ p.user_id }}</span>
+                        {% endif %}
+                    </div>
+                    <strong style="color: var(--primary-hi);">₹{{ '%.2f'|format(p.amount) }}</strong>
+                </div>
+                <div class="row-between">
+                    <span class="muted small">{{ p.created_at[:19] }} · {{ p.method }}</span>
+                    <form method="post" action="{{ url_for('admin_payment_status', pid=p.id) }}">
+                        <select name="status" onchange="this.form.submit()" style="padding:4px 8px;font-size:12px;width:auto;">
                             <option value="success" {{ 'selected' if p.status=='success' }}>✅ Success</option>
                             <option value="pending" {{ 'selected' if p.status=='pending' }}>⏳ Pending</option>
                             <option value="failed" {{ 'selected' if p.status=='failed' }}>❌ Failed</option>
                         </select>
                     </form>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     {% else %}
     <p class="muted small" style="text-align:center;padding:20px 0;">No payments yet.</p>
     {% endif %}
