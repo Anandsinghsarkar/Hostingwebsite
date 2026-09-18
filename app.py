@@ -26,7 +26,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Init Firebase
 init_firebase()
 
-# Firebase Web config (client) — env se aayega
+# Firebase Web config (client-side)
 FIREBASE_WEB_CONFIG = {
     'apiKey': os.environ.get('FB_API_KEY', ''),
     'authDomain': os.environ.get('FB_AUTH_DOMAIN', ''),
@@ -39,7 +39,6 @@ FIREBASE_WEB_CONFIG = {
 
 # --- Auth helpers ---
 def verify_token(id_token):
-    """Verify Firebase ID token, return decoded claims or None."""
     try:
         return fb_auth.verify_id_token(id_token)
     except Exception as e:
@@ -48,7 +47,6 @@ def verify_token(id_token):
 
 
 def current_user():
-    """Get user from session (uid set after login)."""
     uid = session.get('uid')
     if not uid:
         return None
@@ -120,7 +118,6 @@ def login():
 
 @app.route('/auth/session', methods=['POST'])
 def auth_session():
-    """Receive ID token from client, verify, set session."""
     data = request.get_json() or {}
     id_token = data.get('idToken')
     if not id_token:
@@ -135,10 +132,9 @@ def auth_session():
     name = claims.get('name', email.split('@')[0] if email else 'User')
     picture = claims.get('picture', '')
 
-    # Create/update user in Firestore
     user = db.create_or_update_user(uid, email, name, picture)
-
     session['uid'] = uid
+
     return jsonify({'ok': True, 'is_admin': user.get('is_admin', False)})
 
 
@@ -153,20 +149,14 @@ def logout():
 def dashboard():
     user = current_user()
     scripts = db.list_scripts(user['uid'])
-
-    # Augment with live status
     for s in scripts:
         s['status'] = runner.get_status(s['id'])
         s['running'] = s['status'].get('running', False)
-
     running_count = sum(1 for s in scripts if s['running'])
     total_users = db.count_users()
-
-    return render_template('dashboard.html',
-                           user=user,
-                           scripts=scripts,
-                           running_count=running_count,
-                           total_users=total_users)
+    return render_template('dashboard.html', user=user, scripts=scripts,
+                           running_count=running_count, total_users=total_users,
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/my-bots')
@@ -177,14 +167,16 @@ def my_bots():
     for s in scripts:
         s['status'] = runner.get_status(s['id'])
         s['running'] = s['status'].get('running', False)
-    return render_template('my_bots.html', user=user, scripts=scripts)
+    return render_template('my_bots.html', user=user, scripts=scripts,
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/create-bot')
 @login_required
 def create_bot():
     user = current_user()
-    return render_template('create_bot.html', user=user)
+    return render_template('create_bot.html', user=user,
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/upload', methods=['POST'])
@@ -196,12 +188,12 @@ def upload():
         return jsonify({'ok': False, 'error': 'No file'}), 400
 
     if db.count_scripts(user['uid']) >= user.get('file_limit', 2):
-        return jsonify({'ok': False, 'error': f"File limit ({user['file_limit']}) reached"}), 400
+        return jsonify({'ok': False, 'error': f"File limit reached"}), 400
 
     filename = secure_filename(f.filename)
     ext = os.path.splitext(filename)[1].lower()
     if ext not in ALLOWED_EXT:
-        return jsonify({'ok': False, 'error': 'Only .py, .js, .zip allowed'}), 400
+        return jsonify({'ok': False, 'error': 'Only .py, .js, .zip'}), 400
 
     sid = str(uuid.uuid4())[:12]
     sdir = runner.get_script_dir(user['uid'], sid)
@@ -209,21 +201,18 @@ def upload():
 
     if ext == '.zip':
         return _handle_zip(f, user, sid, sdir)
-    else:
-        return _handle_single(f, user, sid, sdir, filename, ext)
+    return _handle_single(f, user, sid, sdir, filename, ext)
 
 
 def _handle_single(f, user, sid, sdir, filename, ext):
     content = f.read()
     if len(content) > MAX_FILE_SIZE:
-        return jsonify({'ok': False, 'error': 'File too large'}), 400
-
-    # Security scan
+        return jsonify({'ok': False, 'error': 'Too large'}), 400
     try:
         text = content.decode('utf-8', errors='ignore')
         ok, pat = scan_code(text)
         if not ok:
-            return jsonify({'ok': False, 'error': f'Dangerous pattern: {pat}'}), 400
+            return jsonify({'ok': False, 'error': f'Dangerous: {pat}'}), 400
     except Exception:
         pass
 
@@ -239,12 +228,11 @@ def _handle_zip(f, user, sid, sdir):
     try:
         zpath = os.path.join(tmp, 'archive.zip')
         f.save(zpath)
-
         with zipfile.ZipFile(zpath) as z:
             for m in z.infolist():
                 p = os.path.abspath(os.path.join(tmp, m.filename))
                 if not p.startswith(os.path.abspath(tmp)):
-                    return jsonify({'ok': False, 'error': 'Unsafe zip path'}), 400
+                    return jsonify({'ok': False, 'error': 'Unsafe zip'}), 400
             z.extractall(tmp)
 
         items = os.listdir(tmp)
@@ -266,7 +254,19 @@ def _handle_zip(f, user, sid, sdir):
             if py: main, main_type = py[0], 'py'
             elif js: main, main_type = js[0], 'js'
         if not main:
-            return jsonify({'ok': False, 'error': 'No .py or .js found'}), 400
+            return jsonify({'ok': False, 'error': 'No .py/.js found'}), 400
+
+        # Security scan
+        for root, _, files in os.walk(tmp):
+            for fn in files:
+                if fn.endswith(('.py', '.js', '.sh')):
+                    try:
+                        with open(os.path.join(root, fn), 'r', encoding='utf-8', errors='ignore') as fh:
+                            ok, pat = scan_code(fh.read())
+                            if not ok:
+                                return jsonify({'ok': False, 'error': f'{fn}: {pat}'}), 400
+                    except Exception:
+                        pass
 
         # Move files
         for item in os.listdir(tmp):
@@ -276,7 +276,7 @@ def _handle_zip(f, user, sid, sdir):
             elif os.path.exists(dst): os.remove(dst)
             shutil.move(src, dst)
 
-        # Auto install deps
+        # Auto-install deps
         req = os.path.join(sdir, 'requirements.txt')
         if os.path.exists(req):
             try:
@@ -297,8 +297,7 @@ def _handle_zip(f, user, sid, sdir):
 def api_start(sid):
     user = current_user()
     s = db.get_script(sid)
-    if not s:
-        return jsonify({'ok': False, 'error': 'Not found'}), 404
+    if not s: return jsonify({'ok': False, 'error': 'Not found'}), 404
     if s['user_id'] != user['uid'] and not user.get('is_admin'):
         return jsonify({'ok': False, 'error': 'Forbidden'}), 403
 
@@ -308,8 +307,7 @@ def api_start(sid):
         return jsonify({'ok': False, 'error': 'File missing'}), 400
 
     ok, msg = runner.start_script(sid, s['user_id'], fpath, s['type'])
-    if ok:
-        db.update_script(sid, {'running': True})
+    if ok: db.update_script(sid, {'running': True})
     return jsonify({'ok': ok, 'message': msg})
 
 
@@ -318,14 +316,12 @@ def api_start(sid):
 def api_stop(sid):
     user = current_user()
     s = db.get_script(sid)
-    if not s:
-        return jsonify({'ok': False, 'error': 'Not found'}), 404
+    if not s: return jsonify({'ok': False}), 404
     if s['user_id'] != user['uid'] and not user.get('is_admin'):
-        return jsonify({'ok': False, 'error': 'Forbidden'}), 403
+        return jsonify({'ok': False}), 403
 
     ok, msg = runner.stop_script(sid)
-    if ok:
-        db.update_script(sid, {'running': False})
+    if ok: db.update_script(sid, {'running': False})
     return jsonify({'ok': ok, 'message': msg})
 
 
@@ -334,11 +330,9 @@ def api_stop(sid):
 def api_logs(sid):
     user = current_user()
     s = db.get_script(sid)
-    if not s:
-        return jsonify({'ok': False}), 404
+    if not s: return jsonify({'ok': False}), 404
     if s['user_id'] != user['uid'] and not user.get('is_admin'):
         return jsonify({'ok': False}), 403
-
     log = runner.read_log(sid, s['user_id'])
     status = runner.get_status(sid)
     return jsonify({'ok': True, 'log': log, 'status': status})
@@ -349,11 +343,9 @@ def api_logs(sid):
 def api_delete(sid):
     user = current_user()
     s = db.get_script(sid)
-    if not s:
-        return jsonify({'ok': False}), 404
+    if not s: return jsonify({'ok': False}), 404
     if s['user_id'] != user['uid'] and not user.get('is_admin'):
         return jsonify({'ok': False}), 403
-
     runner.stop_script(sid)
     sdir = runner.get_script_dir(s['user_id'], sid)
     shutil.rmtree(sdir, ignore_errors=True)
@@ -361,24 +353,25 @@ def api_delete(sid):
     return jsonify({'ok': True})
 
 
-# --- Public pages ---
 @app.route('/pricing')
 def pricing():
     user = current_user()
-    settings = db.get_settings()
-    return render_template('pricing.html', user=user, settings=settings)
+    return render_template('pricing.html', user=user,
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/docs')
 def docs():
     user = current_user()
-    return render_template('docs.html', user=user)
+    return render_template('docs.html', user=user,
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/support')
 def support():
     user = current_user()
-    return render_template('support.html', user=user)
+    return render_template('support.html', user=user,
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/payment-history')
@@ -386,7 +379,8 @@ def support():
 def payment_history():
     user = current_user()
     payments = db.list_payments(user['uid'])
-    return render_template('payment_history.html', user=user, payments=payments)
+    return render_template('payment_history.html', user=user, payments=payments,
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 # ========== ADMIN ==========
@@ -397,19 +391,14 @@ def admin_dashboard():
     user = current_user()
     users = db.list_users()
     scripts = db.list_scripts()
-
-    # Augment
     for u in users:
         u['script_count'] = db.count_scripts(u['uid'])
     for s in scripts:
         s['status'] = runner.get_status(s['id'])
         s['running'] = s['status'].get('running', False)
-
-    return render_template('admin.html',
-                           user=user,
-                           users=users,
-                           scripts=scripts,
-                           running_count=sum(1 for s in scripts if s['running']))
+    return render_template('admin.html', user=user, users=users, scripts=scripts,
+                           running_count=sum(1 for s in scripts if s['running']),
+                           fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/admin/user/<uid>/limit', methods=['POST'])
@@ -438,7 +427,7 @@ def admin_set_plan(uid):
 def admin_toggle_admin(uid):
     val = request.form.get('is_admin') == '1'
     db.make_admin(uid, val)
-    flash(f"Admin status: {val}", "success")
+    flash(f"Admin: {val}", "success")
     return redirect(url_for('admin_dashboard'))
 
 
@@ -461,9 +450,10 @@ def admin_delete_user(uid):
 def admin_payments():
     user = current_user()
     payments = db.list_payments()
-    users = {u['uid']: u for u in db.list_users()}
-    return render_template('admin_payments.html',
-                           user=user, payments=payments, users=users)
+    users_list = db.list_users()
+    users_map = {u['uid']: u for u in users_list}
+    return render_template('admin_payments.html', user=user, payments=payments,
+                           users=users_map, fb_config=FIREBASE_WEB_CONFIG)
 
 
 @app.route('/admin/payment/add', methods=['POST'])
@@ -486,8 +476,7 @@ def admin_add_payment():
 @admin_required
 def admin_start(sid):
     s = db.get_script(sid)
-    if not s:
-        return jsonify({'ok': False}), 404
+    if not s: return jsonify({'ok': False}), 404
     sdir = runner.get_script_dir(s['user_id'], sid)
     fpath = os.path.join(sdir, s['name'])
     if not os.path.exists(fpath):
@@ -501,6 +490,11 @@ def admin_start(sid):
 def admin_stop(sid):
     ok, msg = runner.stop_script(sid)
     return jsonify({'ok': ok, 'message': msg})
+
+
+# --- Cleanup on exit ---
+import atexit
+atexit.register(runner.cleanup_all)
 
 
 if __name__ == '__main__':
