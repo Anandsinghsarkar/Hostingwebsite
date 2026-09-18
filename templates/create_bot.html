@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Create Bot{% endblock %}
+
+{% block content %}
+<h1 class="page-title">➕ Create Bot</h1>
+
+<div class="card" style="max-width: 640px;">
+    <h3 style="margin-bottom: 12px;">Upload Script</h3>
+    <p class="muted small mb-3">
+        Upload a <code>.py</code>, <code>.js</code>, or <code>.zip</code> file (max 20 MB).
+        If your bot has dependencies, include a <code>requirements.txt</code> (Python) or
+        <code>package.json</code> (Node.js) in the zip.
+    </p>
+
+    <form id="uploadForm">
+        <label>Select File</label>
+        <input type="file" name="file" id="fileInput" accept=".py,.js,.zip" required>
+        <div id="status" class="muted small" style="margin: 12px 0;"></div>
+        <button type="submit" class="btn btn-primary" id="submitBtn">🚀 Upload &amp; Deploy</button>
+    </form>
+</div>
+
+<script>
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = document.getElementById('fileInput').files[0];
+    if (!file) return;
+
+    const btn = document.getElementById('submitBtn');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Uploading…';
+    status.textContent = 'Uploading file…';
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.ok) {
+            status.textContent = '✅ Uploaded!';
+            window.location.href = '/my-bots';
+        } else {
+            status.textContent = '❌ ' + (data.error || 'Upload failed');
+            btn.disabled = false;
+            btn.textContent = '🚀 Upload & Deploy';
+        }
+    } catch (e) {
+        status.textContent = '❌ ' + e.message;
+        btn.disabled = false;
+        btn.textContent = '🚀 Upload & Deploy';
+    }
+});
+</script>
+{% endblock %}
