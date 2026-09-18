@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+
+{% block content %}
+<h1 class="page-title">👑 Admin Panel</h1>
+
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon purple">👥</div>
+        <div class="stat-body">
+            <div class="label">Total Users</div>
+            <div class="value">{{ users|length }}</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon cyan">🤖</div>
+        <div class="stat-body">
+            <div class="label">Total Bots</div>
+            <div class="value">{{ scripts|length }}</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green">🟢</div>
+        <div class="stat-body">
+            <div class="label">Running</div>
+            <div class="value">{{ running_count }}</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon gold">💰</div>
+        <div class="stat-body">
+            <div class="label">Revenue</div>
+            <div class="value">₹0</div>
+            <div class="sub">This month</div>
+        </div>
+    </div>
+</div>
+
+<!-- All Users -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3>👥 All Users</h3>
+    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Email</th>
+                <th>Plan</th>
+                <th>Bots</th>
+                <th>Limit</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for u in users %}
+            <tr>
+                <td>
+                    <div class="row">
+                        {% if u.picture %}
+                            <img src="{{ u.picture }}" style="width:32px;height:32px;border-radius:50%;">
+                        {% else %}
+                            <div class="avatar" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--cyan));display:flex;align-items:center;justify-content:center;font-weight:700;">{{ u.name[0]|upper }}</div>
+                        {% endif %}
+                        <div><strong>{{ u.name }}</strong></div>
+                    </div>
+                </td>
+                <td class="muted small">{{ u.email }}</td>
+                <td>
+                    <span class="badge {{ 'badge-premium' if u.plan == 'premium' else 'badge-off' }}">
+                        {{ u.plan|upper }}
+                    </span>
+                </td>
+                <td>{{ u.script_count }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin_set_limit', uid=u.uid) }}" style="display:flex;gap:6px;">
+                        <input name="limit" type="number" min="0" value="{{ u.file_limit }}" style="width:70px;padding:4px 8px;">
+                        <button class="btn btn-ghost btn-xs">Save</button>
+                    </form>
+                </td>
+                <td>
+                    {% if u.is_admin %}
+                        <span class="badge badge-admin">👑 Admin</span>
+                    {% else %}
+                        <span class="badge badge-off">User</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="row">
+                        <form method="post" action="{{ url_for('admin_toggle_admin', uid=u.uid) }}" style="display:inline;">
+                            <input type="hidden" name="is_admin" value="{{ '0' if u.is_admin else '1' }}">
+                            <button class="btn btn-ghost btn-xs">{{ 'Remove Admin' if u.is_admin else 'Make Admin' }}</button>
+                        </form>
+                        <form method="post" action="{{ url_for('admin_set_plan', uid=u.uid) }}" style="display:inline;">
+                            <select name="plan" onchange="this.form.submit()" style="padding:4px 8px;font-size:11px;">
+                                <option value="free" {{ 'selected' if u.plan=='free' }}>Free</option>
+                                <option value="premium" {{ 'selected' if u.plan=='premium' }}>Premium</option>
+                                <option value="business" {{ 'selected' if u.plan=='business' }}>Business</option>
+                            </select>
+                        </form>
+                        {% if u.uid != user.uid %}
+                        <form method="post" action="{{ url_for('admin_delete_user', uid=u.uid) }}" style="display:inline;" onsubmit="return confirm('Delete this user?')">
+                            <button class="btn btn-danger btn-xs">🗑️</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- All Bots -->
+<div class="card">
+    <div class="card-header">
+        <h3>🤖 All Running Bots</h3>
+    </div>
+    {% if scripts %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Bot</th>
+                <th>Owner</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in scripts %}
+            <tr>
+                <td><strong>{{ s.name }}</strong></td>
+                <td class="muted small">{{ s.user_id }}</td>
+                <td><span class="badge badge-off">{{ s.type|upper }}</span></td>
+                <td>
+                    {% if s.running %}
+                        <span class="badge badge-on"><span class="dot on"></span> Running</span>
+                    {% else %}
+                        <span class="badge badge-off"><span class="dot off"></span> Stopped</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if s.running %}
+                    <button class="btn btn-danger btn-xs" onclick="adminAct('{{ s.id }}', 'stop')">⏹ Stop</button>
+                    {% else %}
+                    <button class="btn btn-primary btn-xs" onclick="adminAct('{{ s.id }}', 'start')">▶ Start</button>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="muted small" style="padding: 20px 0; text-align: center;">No bots hosted yet.</p>
+    {% endif %}
+</div>
+
+<script>
+async function adminAct(sid, action) {
+    const res = await fetch(`/admin/script/${sid}/${action}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) location.reload();
+    else alert(data.message || 'Failed');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login — A7 HOSTING</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="login-page">
+    <div class="login-card">
+        <div class="logo">
+            <div class="logo-icon">A7</div>
+            <div class="logo-text">A7 HOSTING</div>
+        </div>
+        <h1>Welcome Back 👋</h1>
+        <p class="sub">Sign in with Google to host your Telegram bots 24/7</p>
+
+        <button id="googleBtn" class="google-btn">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
+            Continue with Google
+        </button>
+
+        <div class="divider">SECURE AUTHENTICATION</div>
+
+        <div id="errorBox" class="flash flash-error" style="display:none;"></div>
+
+        <div class="footer-note">
+            By continuing, you agree to our Terms of Service & Privacy Policy.
+        </div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp({
+    apiKey: "{{ fb_config.apiKey }}",
+    authDomain: "{{ fb_config.authDomain }}",
+    projectId: "{{ fb_config.projectId }}",
+    storageBucket: "{{ fb_config.storageBucket }}",
+    messagingSenderId: "{{ fb_config.messagingSenderId }}",
+    appId: "{{ fb_config.appId }}"
+});
+
+const provider = new firebase.auth.GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
+
+document.getElementById('googleBtn').addEventListener('click', async () => {
+    const errBox = document.getElementById('errorBox');
+    errBox.style.display = 'none';
+    try {
+        const result = await firebase.auth().signInWithPopup(provider);
+        const idToken = await result.user.getIdToken();
+
+        // Send token to backend
+        const res = await fetch('/auth/session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ idToken })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            window.location.href = data.is_admin ? '/admin' : '/dashboard';
+        } else {
+            errBox.textContent = data.error || 'Login failed';
+            errBox.style.display = 'block';
+        }
+    } catch (e) {
+        errBox.textContent = e.message || 'Google sign-in failed';
+        errBox.style.display = 'block';
+    }
+});
+</script>
+</body>
+</html>

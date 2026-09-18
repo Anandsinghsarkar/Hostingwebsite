@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- ============ HERO BANNER ============ -->
+<div class="hero">
+    <div class="hero-inner">
+        <div class="hero-badge">⚡ POWERED BY CYBER KING</div>
+        <h1>
+            <span class="grad">A7 HOSTING</span><br>
+            TELEGRAM BOT HOSTING PLATFORM
+        </h1>
+        <p>Host your Telegram Bot 24/7 with high speed, security and zero downtime. Simple. Fast. Reliable.</p>
+
+        <div class="hero-bullets">
+            <span>🟢 24/7 Online</span>
+            <span>⚡ High Speed</span>
+            <span>🛡️ DDoS Protection</span>
+            <span>🎯 Easy to Use</span>
+        </div>
+
+        <a href="{{ url_for('create_bot') }}" class="btn btn-primary">Get Started →</a>
+    </div>
+    <div class="hero-art">
+        <div class="hero-art-placeholder"></div>
+    </div>
+</div>
+
+<!-- ============ STATS ROW ============ -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon purple">🤖</div>
+        <div class="stat-body">
+            <div class="label">Total Bots</div>
+            <div class="value">{{ scripts|length }}</div>
+            <div class="sub">Active Bots</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon cyan">👥</div>
+        <div class="stat-body">
+            <div class="label">Total Users</div>
+            <div class="value">{{ total_users }}</div>
+            <div class="sub">Online Users</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon gold">⏱️</div>
+        <div class="stat-body">
+            <div class="label">Uptime</div>
+            <div class="value">99.9%</div>
+            <div class="sub">Server Uptime</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green">⚡</div>
+        <div class="stat-body">
+            <div class="label">Response Time</div>
+            <div class="value">&lt; 1s</div>
+            <div class="sub">Average Speed</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ MAIN + RIGHT RAIL ============ -->
+<div class="dash-grid">
+    <div>
+        <!-- Feature Grid -->
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon" style="background:rgba(6,182,212,.15);color:var(--cyan-hi)">🚀</div>
+                <h4>Instant Deployment</h4>
+                <p>Deploy your bot in seconds with our powerful infrastructure.</p>
+                <a href="{{ url_for('create_bot') }}" class="link">Learn More →</a>
+            </div>
+            <div class="feature">
+                <div class="feature-icon" style="background:rgba(6,182,212,.15);color:var(--cyan-hi)">🛡️</div>
+                <h4>DDoS Protection</h4>
+                <p>Your bot stays safe with advanced security layers.</p>
+                <a href="{{ url_for('docs') }}" class="link">Learn More →</a>
+            </div>
+            <div class="feature">
+                <div class="feature-icon" style="background:rgba(168,85,247,.15);color:var(--primary-hi)">⚡</div>
+                <h4>24/7 Uptime</h4>
+                <p>Always online, always active. No downtime, no worries.</p>
+                <a href="{{ url_for('docs') }}" class="link">Learn More →</a>
+            </div>
+            <div class="feature">
+                <div class="feature-icon" style="background:rgba(168,85,247,.15);color:var(--primary-hi)">⚙️</div>
+                <h4>Easy Management</h4>
+                <p>Simple dashboard to manage your bots with ease.</p>
+                <a href="{{ url_for('my_bots') }}" class="link">Learn More →</a>
+            </div>
+        </div>
+
+        <!-- Top Features Bar -->
+        <div class="top-features">
+            <div class="title">⭐ Top Features</div>
+            <div class="tf-item">⚙️ <div><b>Multiple Bots</b><span>Host multiple bots at once</span></div></div>
+            <div class="tf-item">🌐 <div><b>Custom Domain</b><span>Use your own domain</span></div></div>
+            <div class="tf-item">📁 <div><b>File Storage</b><span>Secure &amp; fast storage</span></div></div>
+            <div class="tf-item">📊 <div><b>Logs &amp; Monitoring</b><span>Real-time bot logs</span></div></div>
+            <div class="tf-item">🔌 <div><b>API Access</b><span>Integrate with API</span></div></div>
+        </div>
+    </div>
+
+    <!-- Right Rail -->
+    <div class="right-rail">
+
+        <div class="card">
+            <div class="card-header">
+                <h3>🤖 Your Bots</h3>
+                <a href="{{ url_for('my_bots') }}" class="link">View All →</a>
+            </div>
+
+            {% if scripts %}
+            <div class="bot-list">
+                {% for s in scripts[:5] %}
+                <div class="bot-item">
+                    <div class="bot-avatar">
+                        {% if s.running %}🟢{% else %}⚪{% endif %}
+                        {% if user.plan == 'premium' %}<span class="crown">👑</span>{% endif %}
+                    </div>
+                    <div class="bot-info">
+                        <div class="name">{{ s.name }}</div>
+                        <div class="status">
+                            <span class="dot {{ 'on' if s.running else 'off' }}"></span>
+                            {{ 'Online' if s.running else 'Offline' }}
+                        </div>
+                    </div>
+                    <div class="bot-actions">
+                        <button class="bot-play {% if s.running %}stop{% endif %}"
+                                onclick="toggleBot('{{ s.id }}', {{ 'true' if s.running else 'false' }})">
+                            {{ '⏹' if s.running else '▶' }}
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="muted small" style="text-align:center; padding: 20px 0;">
+                No bots yet. <a href="{{ url_for('create_bot') }}">Create one →</a>
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- Offer Card -->
+        <div class="offer-card">
+            <h4>👑 Special Offer</h4>
+            <div class="big">Get 50% OFF</div>
+            <div class="sub">on Premium Plan</div>
+            <a href="{{ url_for('pricing') }}" class="btn btn-primary btn-sm" style="width:100%;">Upgrade Now →</a>
+        </div>
+
+        <!-- Support Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>✈️ Ready to Host Your Bot?</h3>
+            </div>
+            <p class="muted small" style="margin-bottom: 12px;">
+                Join our Telegram channel for updates &amp; support.
+            </p>
+            <a href="https://t.me/a7hosting" target="_blank" class="btn btn-cyan btn-sm" style="width:100%;">Join Channel →</a>
+        </div>
+
+    </div>
+</div>
+
+<footer style="margin-top: 32px; padding: 20px 0; border-top: 1px solid var(--border); display:flex; justify-content:space-between; font-size: 12px; color: var(--text-mute); flex-wrap:wrap; gap:12px;">
+    <div>A7 Hosting © 2025. All rights reserved.</div>
+    <div>Built with ❤️ by Cyber King</div>
+    <div>
+        <a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a> · <a href="#">Contact Us</a>
+    </div>
+</footer>
+
+<script>
+async function toggleBot(sid, isRunning) {
+    const url = isRunning ? `/api/script/${sid}/stop` : `/api/script/${sid}/start`;
+    const res = await fetch(url, { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+        location.reload();
+    } else {
+        alert(data.message || data.error || 'Action failed');
+    }
+}
+</script>
+
+{% endblock %}
