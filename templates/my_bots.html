@@ -4,58 +4,50 @@
 {% block content %}
 <div class="row-between mb-3">
     <h1 class="page-title" style="margin:0;">🤖 My Bots</h1>
-    <a href="{{ url_for('create_bot') }}" class="btn btn-primary">➕ Create Bot</a>
+    <a href="{{ url_for('create_bot') }}" class="btn btn-primary btn-sm">➕ Create</a>
 </div>
 
 {% if scripts %}
-<div class="card">
-<table class="table">
-    <thead>
-        <tr>
-            <th>Bot Name</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Uptime</th>
-            <th>RAM</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for s in scripts %}
-        <tr>
-            <td>
-                <strong>{{ s.name }}</strong><br>
-                <span class="muted small">ID: {{ s.id }}</span>
-            </td>
-            <td><span class="badge badge-off">{{ s.type|upper }}</span></td>
-            <td>
+    <!-- Mobile Card View -->
+    <div class="mobile-bots-cards" style="display: flex; flex-direction: column; gap: 12px;">
+        {% for s in scripts %}
+        <div class="card" style="padding: 14px;">
+            <div class="row-between mb-2">
+                <div style="flex: 1; min-width: 0;">
+                    <strong style="font-size: 14px; display: block; word-break: break-all;">{{ s.name }}</strong>
+                    <span class="muted small">ID: {{ s.id }} · {{ s.type|upper }}</span>
+                </div>
                 {% if s.running %}
                     <span class="badge badge-on"><span class="dot on"></span> Running</span>
                 {% else %}
                     <span class="badge badge-off"><span class="dot off"></span> Stopped</span>
                 {% endif %}
-            </td>
-            <td class="muted">{{ s.status.uptime ~ 's' if s.running else '—' }}</td>
-            <td class="muted">{{ s.status.memory_mb ~ ' MB' if s.running else '—' }}</td>
-            <td>
-                <div class="row">
-                    {% if s.running %}
-                    <button class="btn btn-danger btn-xs" onclick="act('{{ s.id }}', 'stop')">⏹ Stop</button>
-                    {% else %}
-                    <button class="btn btn-primary btn-xs" onclick="act('{{ s.id }}', 'start')">▶ Start</button>
-                    {% endif %}
-                    <button class="btn btn-ghost btn-xs" onclick="viewLogs('{{ s.id }}')">📜 Logs</button>
-                    <button class="btn btn-ghost btn-xs" onclick="delBot('{{ s.id }}')">🗑️</button>
-                </div>
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
-</div>
+            </div>
+
+            {% if s.running %}
+            <div class="muted small mb-2" style="display:flex; gap:14px;">
+                <span>⏱️ {{ s.status.uptime }}s</span>
+                <span>💾 {{ s.status.memory_mb }}MB</span>
+            </div>
+            {% endif %}
+
+            <!-- Bottom action buttons -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-top: 10px;">
+                {% if s.running %}
+                    <button class="btn btn-danger btn-sm" onclick="act('{{ s.id }}', 'stop')" style="padding: 10px 6px;">⏹ Stop</button>
+                {% else %}
+                    <button class="btn btn-primary btn-sm" onclick="act('{{ s.id }}', 'start')" style="padding: 10px 6px;">▶ Start</button>
+                {% endif %}
+                <button class="btn btn-ghost btn-sm" onclick="act('{{ s.id }}', 'restart')" style="padding: 10px 6px;">🔄</button>
+                <button class="btn btn-ghost btn-sm" onclick="viewLogs('{{ s.id }}')" style="padding: 10px 6px;">📜</button>
+                <button class="btn btn-ghost btn-sm" onclick="delBot('{{ s.id }}')" style="padding: 10px 6px;">🗑️</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 {% else %}
-<div class="card" style="text-align: center; padding: 60px 20px;">
-    <div style="font-size: 60px; margin-bottom: 12px;">🤖</div>
+<div class="card" style="text-align: center; padding: 50px 20px;">
+    <div style="font-size: 56px; margin-bottom: 12px;">🤖</div>
     <h3 style="margin-bottom: 8px;">No Bots Yet</h3>
     <p class="muted mb-3">Create your first bot to get started</p>
     <a href="{{ url_for('create_bot') }}" class="btn btn-primary">➕ Create Bot</a>
