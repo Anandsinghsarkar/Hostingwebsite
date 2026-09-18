@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Script process manager — subprocess.Popen based.
-Har script ka apna process + log file hoti hai.
 """
 import os
 import sys
@@ -13,63 +12,133 @@ from datetime import datetime
 import psutil
 
 
-# --- Import name → PyPI package name mapping ---
+# ============================================================
+# IMPORT NAME → PYPI PACKAGE NAME MAPPING
+# ============================================================
 PACKAGE_MAP = {
-    # Telegram
-    'telegram': 'python-telegram-bot',
-    'telebot': 'pyTelegramBotAPI',
-    'telegram_ext': 'python-telegram-bot',
-    'pyrogram': 'pyrogram',
-    'aiogram': 'aiogram',
-    'telethon': 'telethon',
-    'tgcrypto': 'TgCrypto',
+    # --- Telegram ecosystem ---
+    "telegram":      "python-telegram-bot",
+    "telebot":       "pyTelegramBotAPI",
+    "telethon":      "Telethon",
+    "pyrogram":      "Pyrogram",
+    "pyromod":       "pyromod",
+    "tgcrypto":      "TgCrypto",
+    "aiogram":       "aiogram",
 
-    # Common differences
-    'cv2': 'opencv-python',
-    'PIL': 'Pillow',
-    'pillow': 'Pillow',
-    'bs4': 'beautifulsoup4',
-    'yaml': 'PyYAML',
-    'dotenv': 'python-dotenv',
-    'sklearn': 'scikit-learn',
-    'skimage': 'scikit-image',
-    'serial': 'pyserial',
-    'Crypto': 'pycryptodome',
-    'jwt': 'PyJWT',
-    'dateutil': 'python-dateutil',
-    'flask_cors': 'flask-cors',
-    'flask_sqlalchemy': 'flask-sqlalchemy',
-    'mysql': 'mysql-connector-python',
-    'psycopg2': 'psycopg2-binary',
-    'discord': 'discord.py',
-    'gtts': 'gTTS',
-    'pydub': 'pydub',
-    'moviepy': 'moviepy',
-    'yt_dlp': 'yt-dlp',
-    'pytube': 'pytube',
-    'googlesearch': 'googlesearch-python',
-    'speech_recognition': 'SpeechRecognition',
-    'docx': 'python-docx',
-    'pptx': 'python-pptx',
-    'openpyxl': 'openpyxl',
-    'fpdf': 'fpdf2',
-    'qrcode': 'qrcode',
-    'pytz': 'pytz',
-    'win32api': 'pywin32',
-    'win32com': 'pywin32',
-    'openai': 'openai',
-    'anthropic': 'anthropic',
-    'instagrapi': 'instagrapi',
-    'instaloader': 'instaloader',
-    'tweepy': 'tweepy',
-    'praw': 'praw',
-    'wikipedia': 'wikipedia',
-    'googletrans': 'googletrans==4.0.0-rc1',
-    'deep_translator': 'deep-translator',
+    # --- Common import↔package differences ---
+    "PIL":           "Pillow",
+    "cv2":           "opencv-python",
+    "bs4":           "beautifulsoup4",
+    "yaml":          "PyYAML",
+    "dotenv":        "python-dotenv",
+    "Crypto":        "pycryptodome",
+    "Cryptodome":    "pycryptodomex",
+    "dateutil":      "python-dateutil",
+    "magic":         "python-magic",
+    "skimage":       "scikit-image",
+    "sklearn":       "scikit-learn",
+    "google":        "google-api-python-client",
+    "googletrans":   "googletrans",
+    "OpenSSL":       "pyOpenSSL",
+    "wx":            "wxPython",
+    "psycopg2":      "psycopg2-binary",
+    "MySQLdb":       "mysqlclient",
+    "serial":        "pyserial",
+    "win32api":      "pywin32",
+    "ujson":         "ujson",
+    "uvloop":        "uvloop",
+    "discord":       "discord.py",
+    "httpx":         "httpx",
+    "aiohttp":       "aiohttp",
+    "fastapi":       "fastapi",
+    "flask":         "Flask",
+    "starlette":     "starlette",
+    "redis":         "redis",
+    "pymongo":       "pymongo",
+    "motor":         "motor",
+    "psutil":        "psutil",
+    "schedule":      "schedule",
+    "apscheduler":   "APScheduler",
+    "cryptography":  "cryptography",
+    "github":        "PyGithub",
+    "requests":      "requests",
+
+    # --- Extra safety net ---
+    "nacl":          "PyNaCl",
+    "git":           "GitPython",
+    "jose":          "python-jose",
+    "pkg_resources": "setuptools",
+    "lxml":          "lxml",
+    "chardet":       "chardet",
+
+    # --- More common ones ---
+    "docx":          "python-docx",
+    "pptx":          "python-pptx",
+    "openpyxl":      "openpyxl",
+    "fpdf":          "fpdf2",
+    "qrcode":        "qrcode",
+    "pytz":          "pytz",
+    "yt_dlp":        "yt-dlp",
+    "pytube":        "pytube",
+    "instagrapi":    "instagrapi",
+    "instaloader":   "instaloader",
+    "tweepy":        "tweepy",
+    "praw":          "praw",
+    "wikipedia":     "wikipedia",
+    "gtts":          "gTTS",
+    "pydub":         "pydub",
+    "moviepy":       "moviepy",
+    "openai":        "openai",
+    "anthropic":     "anthropic",
+    "cohere":        "cohere",
+    "transformers":  "transformers",
+    "torch":         "torch",
+    "tensorflow":    "tensorflow",
+    "keras":         "keras",
+    "numpy":         "numpy",
+    "pandas":        "pandas",
+    "matplotlib":    "matplotlib",
+    "seaborn":       "seaborn",
+    "plotly":        "plotly",
+    "scipy":         "scipy",
+    "selenium":      "selenium",
+    "playwright":    "playwright",
+    "scrapy":        "Scrapy",
+    "pyautogui":     "pyautogui",
+    "pynput":        "pynput",
+    "keyboard":      "keyboard",
+    "speech_recognition": "SpeechRecognition",
+    "gspread":       "gspread",
+    "cloudscraper":  "cloudscraper",
+    "colorama":      "colorama",
+    "rich":          "rich",
+    "tqdm":          "tqdm",
+    "tabulate":      "tabulate",
+    "emoji":         "emoji",
+    "pyfiglet":      "pyfiglet",
+    "termcolor":     "termcolor",
+    "psycopg":       "psycopg",
+    "asyncpg":       "asyncpg",
+    "sqlalchemy":    "SQLAlchemy",
+    "alembic":       "alembic",
+    "celery":        "celery",
+    "django":        "Django",
+    "jinja2":        "Jinja2",
+    "werkzeug":      "Werkzeug",
+    "click":         "click",
+    "typer":         "typer",
+    "rich":          "rich",
+    "loguru":        "loguru",
+    "structlog":     "structlog",
+    "orjson":        "orjson",
+    "marshmallow":   "marshmallow",
+    "pydantic":      "pydantic",
+    "attrs":         "attrs",
+    "boltons":       "boltons",
 }
 
 
-# --- Core Python modules — install nahi karne ---
+# --- Core Python modules (install nahi karte) ---
 CORE_MODULES = {
     'os', 'sys', 're', 'json', 'time', 'datetime', 'math', 'random',
     'logging', 'threading', 'subprocess', 'asyncio', 'collections',
@@ -143,14 +212,12 @@ def _cleanup(script_id):
 
 
 def start_script(script_id, user_id, file_path, file_type):
-    """Start script. Returns (ok, message)."""
     if is_running(script_id):
         return False, "Script already running"
 
     script_dir = get_script_dir(user_id, script_id)
     log_path = os.path.join(script_dir, 'output.log')
 
-    # Rotate log
     try:
         if os.path.exists(log_path) and os.path.getsize(log_path) > 2 * 1024 * 1024:
             os.remove(log_path)
@@ -163,7 +230,6 @@ def start_script(script_id, user_id, file_path, file_type):
     log_file.write(f"\n\n===== Starting {datetime.now().isoformat()} =====\n")
     log_file.flush()
 
-    # Pre-check for missing modules
     try:
         missing = _precheck(cmd, script_dir, log_file)
         if missing:
@@ -175,13 +241,12 @@ def start_script(script_id, user_id, file_path, file_type):
                 log_file.flush()
                 log_file.close()
                 return False, f"Missing '{missing}' and install failed"
-            log_file.write(f"[SYSTEM] Installed '{missing}'. Retrying...\n")
+            log_file.write(f"[SYSTEM] ✅ Installed '{missing}'. Retrying...\n")
             log_file.flush()
     except Exception as e:
         log_file.write(f"[SYSTEM] Precheck error: {e}\n")
         log_file.flush()
 
-    # Start long-running process
     try:
         kwargs = {}
         if os.name != 'nt':
@@ -286,7 +351,6 @@ def _resolve_package_name(module):
 
 
 def _precheck(cmd, cwd, log_file=None):
-    """Run script briefly. Return missing module name or None."""
     try:
         r = subprocess.run(
             cmd, cwd=cwd,
@@ -296,21 +360,18 @@ def _precheck(cmd, cwd, log_file=None):
         )
         if r.returncode != 0 and r.stderr:
             stderr = r.stderr
-
             m = re.search(r"ModuleNotFoundError: No module named '([^']+)'", stderr)
             if m:
                 mod = m.group(1).split('.')[0]
                 if mod in CORE_MODULES:
                     return None
                 return mod
-
             m = re.search(r"ImportError: cannot import name .+ from '([^']+)'", stderr)
             if m:
                 mod = m.group(1).split('.')[0]
                 if mod in CORE_MODULES:
                     return None
                 return mod
-
             m = re.search(r"Cannot find module '([^']+)'", stderr)
             if m:
                 mod = m.group(1)
@@ -332,8 +393,13 @@ def _precheck(cmd, cwd, log_file=None):
 
 
 def _auto_install(module, file_type, cwd, user_id, log_file=None):
-    from db import log_install  # comment out if you don't have this
+    try:
+        from db import log_install
+    except Exception:
+        log_install = None
+
     package = _resolve_package_name(module)
+
     if package is None:
         if log_file:
             log_file.write(f"[SYSTEM] '{module}' is core, skipping.\n")
@@ -357,6 +423,15 @@ def _auto_install(module, file_type, cwd, user_id, log_file=None):
             timeout=180
         )
 
+        full_log = f"$ {' '.join(cmd)}\n\n{r.stdout or ''}\n\n{r.stderr or ''}"
+
+        if log_install:
+            try:
+                status = 'success' if r.returncode == 0 else 'failed'
+                log_install(user_id, f"{module} → {package}", status, full_log)
+            except Exception:
+                pass
+
         if log_file:
             if r.returncode == 0:
                 log_file.write(f"[SYSTEM] ✅ Installed '{package}'.\n")
@@ -369,7 +444,10 @@ def _auto_install(module, file_type, cwd, user_id, log_file=None):
         return r.returncode == 0
     except subprocess.TimeoutExpired:
         return False
-    except Exception:
+    except Exception as e:
+        if log_file:
+            log_file.write(f"[SYSTEM] Install exception: {e}\n")
+            log_file.flush()
         return False
 
 
