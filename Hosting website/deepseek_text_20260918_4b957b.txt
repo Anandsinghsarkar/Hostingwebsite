@@ -1,8 +1,0 @@
-SECRET_KEY=<random-32-char>
-FB_API_KEY=AIza...
-FB_AUTH_DOMAIN=your-project.firebaseapp.com
-FB_PROJECT_ID=your-project-id
-FB_STORAGE_BUCKET=your-project.appspot.com
-FB_SENDER_ID=1234567890
-FB_APP_ID=1:123:web:abc...
-FIREBASE_STORAGE_BUCKET=your-project.appspot.com

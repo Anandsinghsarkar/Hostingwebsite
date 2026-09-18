@@ -1,1 +1,0 @@
-FIREBASE_KEY_JSON={"type":"service_account","project_id":"...", ...}
