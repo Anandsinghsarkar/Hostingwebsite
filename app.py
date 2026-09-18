@@ -1,69 +1,85 @@
 # -*- coding: utf-8 -*-
-import os
-import sys
-import re
-import zipfile
-import tempfile
-import shutil
-import threading
-import subprocess
+import os, sys, re, zipfile, tempfile, shutil, subprocess, uuid
 from functools import wraps
 from datetime import datetime
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, jsonify, flash, abort, send_file)
 from werkzeug.utils import secure_filename
-from werkzeug.security import generate_password_hash, check_password_hash
 
 import db
 import runner
+from firebase_config import init_firebase
+from firebase_admin import auth as fb_auth
 
 # --- Config ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+MAX_FILE_SIZE = 20 * 1024 * 1024
 ALLOWED_EXT = {'.py', '.js', '.zip'}
-
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ⚠️ IMPORTANT: Ye line Gunicorn dhundta hai
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me-in-production')
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
-# Init database
-db.init_db()
+# Init Firebase
+init_firebase()
+
+# Firebase Web config (client) — env se aayega
+FIREBASE_WEB_CONFIG = {
+    'apiKey': os.environ.get('FB_API_KEY', ''),
+    'authDomain': os.environ.get('FB_AUTH_DOMAIN', ''),
+    'projectId': os.environ.get('FB_PROJECT_ID', ''),
+    'storageBucket': os.environ.get('FB_STORAGE_BUCKET', ''),
+    'messagingSenderId': os.environ.get('FB_SENDER_ID', ''),
+    'appId': os.environ.get('FB_APP_ID', ''),
+}
 
 
-# --- Auth Helpers ---
+# --- Auth helpers ---
+def verify_token(id_token):
+    """Verify Firebase ID token, return decoded claims or None."""
+    try:
+        return fb_auth.verify_id_token(id_token)
+    except Exception as e:
+        print(f"Token verify failed: {e}")
+        return None
+
+
 def current_user():
-    uid = session.get('user_id')
+    """Get user from session (uid set after login)."""
+    uid = session.get('uid')
     if not uid:
         return None
-    return db.get_user_by_id(uid)
+    u = db.get_user(uid)
+    if not u:
+        return None
+    u['uid'] = uid
+    return u
 
 
 def login_required(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
+    def w(*a, **kw):
         if not current_user():
             return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return wrapper
+        return f(*a, **kw)
+    return w
 
 
 def admin_required(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
-        user = current_user()
-        if not user or not user['is_admin']:
+    def w(*a, **kw):
+        u = current_user()
+        if not u or not u.get('is_admin'):
             abort(403)
-        return f(*args, **kwargs)
-    return wrapper
+        return f(*a, **kw)
+    return w
 
 
-# --- Security Scan ---
-DANGEROUS_PATTERNS = [
+# --- Security scan ---
+DANGEROUS = [
     r'rm\s+-rf\s+/',
     r'\bos\.system\s*\(',
     r'\bos\.popen\s*\(',
@@ -71,18 +87,18 @@ DANGEROUS_PATTERNS = [
     r'\bctypes\b',
     r'__import__\s*\(\s*[\'"]os[\'"]\s*\)',
     r'shutil\.rmtree\s*\(\s*[\'"]/',
-    r':\(\)\s*\{',
 ]
 
 
 def scan_code(text):
-    for pattern in DANGEROUS_PATTERNS:
-        if re.search(pattern, text):
-            return False, pattern
+    for pat in DANGEROUS:
+        if re.search(pat, text):
+            return False, pat
     return True, None
 
 
-# --- Routes ---
+# ========== ROUTES ==========
+
 @app.route('/')
 def index():
     if current_user():
@@ -92,47 +108,38 @@ def index():
 
 @app.route('/health')
 def health():
-    return jsonify({'status': 'ok', 'time': datetime.now().isoformat()})
+    return jsonify({'status': 'ok'})
 
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
-
-        if not username or len(username) < 3:
-            flash("Username must be at least 3 characters", "error")
-            return render_template('register.html')
-        if len(password) < 4:
-            flash("Password must be at least 4 characters", "error")
-            return render_template('register.html')
-
-        ok = db.create_user(username, generate_password_hash(password))
-        if not ok:
-            flash("Username already exists", "error")
-            return render_template('register.html')
-
-        flash("Account created! Please login.", "success")
-        return redirect(url_for('login'))
-
-    return render_template('register.html')
-
-
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login')
 def login():
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
+    if current_user():
+        return redirect(url_for('dashboard'))
+    return render_template('login.html', fb_config=FIREBASE_WEB_CONFIG)
 
-        user = db.get_user_by_username(username)
-        if user and check_password_hash(user['password_hash'], password):
-            session['user_id'] = user['id']
-            return redirect(url_for('dashboard'))
 
-        flash("Invalid credentials", "error")
+@app.route('/auth/session', methods=['POST'])
+def auth_session():
+    """Receive ID token from client, verify, set session."""
+    data = request.get_json() or {}
+    id_token = data.get('idToken')
+    if not id_token:
+        return jsonify({'ok': False, 'error': 'No token'}), 400
 
-    return render_template('login.html')
+    claims = verify_token(id_token)
+    if not claims:
+        return jsonify({'ok': False, 'error': 'Invalid token'}), 401
+
+    uid = claims['uid']
+    email = claims.get('email', '')
+    name = claims.get('name', email.split('@')[0] if email else 'User')
+    picture = claims.get('picture', '')
+
+    # Create/update user in Firestore
+    user = db.create_or_update_user(uid, email, name, picture)
+
+    session['uid'] = uid
+    return jsonify({'ok': True, 'is_admin': user.get('is_admin', False)})
 
 
 @app.route('/logout')
@@ -145,15 +152,39 @@ def logout():
 @login_required
 def dashboard():
     user = current_user()
-    scripts = db.list_scripts(user['id'])
+    scripts = db.list_scripts(user['uid'])
 
-    scripts_info = []
+    # Augment with live status
     for s in scripts:
-        status = runner.get_status(s['id'])
-        scripts_info.append({'script': s, 'status': status})
+        s['status'] = runner.get_status(s['id'])
+        s['running'] = s['status'].get('running', False)
 
-    return render_template('dashboard.html', user=user,
-                           scripts=scripts_info, count=len(scripts))
+    running_count = sum(1 for s in scripts if s['running'])
+    total_users = db.count_users()
+
+    return render_template('dashboard.html',
+                           user=user,
+                           scripts=scripts,
+                           running_count=running_count,
+                           total_users=total_users)
+
+
+@app.route('/my-bots')
+@login_required
+def my_bots():
+    user = current_user()
+    scripts = db.list_scripts(user['uid'])
+    for s in scripts:
+        s['status'] = runner.get_status(s['id'])
+        s['running'] = s['status'].get('running', False)
+    return render_template('my_bots.html', user=user, scripts=scripts)
+
+
+@app.route('/create-bot')
+@login_required
+def create_bot():
+    user = current_user()
+    return render_template('create_bot.html', user=user)
 
 
 @app.route('/upload', methods=['POST'])
@@ -161,376 +192,317 @@ def dashboard():
 def upload():
     user = current_user()
     f = request.files.get('file')
-
     if not f or not f.filename:
-        flash("No file selected", "error")
-        return redirect(url_for('dashboard'))
+        return jsonify({'ok': False, 'error': 'No file'}), 400
 
-    if db.count_scripts(user['id']) >= user['file_limit']:
-        flash(f"File limit ({user['file_limit']}) reached", "error")
-        return redirect(url_for('dashboard'))
+    if db.count_scripts(user['uid']) >= user.get('file_limit', 2):
+        return jsonify({'ok': False, 'error': f"File limit ({user['file_limit']}) reached"}), 400
 
     filename = secure_filename(f.filename)
     ext = os.path.splitext(filename)[1].lower()
-
     if ext not in ALLOWED_EXT:
-        flash("Only .py, .js, .zip allowed", "error")
-        return redirect(url_for('dashboard'))
+        return jsonify({'ok': False, 'error': 'Only .py, .js, .zip allowed'}), 400
+
+    sid = str(uuid.uuid4())[:12]
+    sdir = runner.get_script_dir(user['uid'], sid)
+    os.makedirs(sdir, exist_ok=True)
 
     if ext == '.zip':
-        return _handle_zip(f, user)
+        return _handle_zip(f, user, sid, sdir)
     else:
-        return _handle_single(f, user, filename, ext)
+        return _handle_single(f, user, sid, sdir, filename, ext)
 
 
-def _handle_single(f, user, filename, ext):
+def _handle_single(f, user, sid, sdir, filename, ext):
     content = f.read()
     if len(content) > MAX_FILE_SIZE:
-        flash("File too large", "error")
-        return redirect(url_for('dashboard'))
+        return jsonify({'ok': False, 'error': 'File too large'}), 400
 
     # Security scan
     try:
         text = content.decode('utf-8', errors='ignore')
-        ok, pattern = scan_code(text)
+        ok, pat = scan_code(text)
         if not ok:
-            flash(f"Security: dangerous pattern detected ({pattern})", "error")
-            return redirect(url_for('dashboard'))
+            return jsonify({'ok': False, 'error': f'Dangerous pattern: {pat}'}), 400
     except Exception:
         pass
-
-    sid = db.add_script(user['id'], filename, ext[1:])
-    sdir = runner.get_script_dir(user['id'], sid)
 
     with open(os.path.join(sdir, filename), 'wb') as out:
         out.write(content)
 
-    flash(f"Uploaded '{filename}'. Click Start to run.", "success")
-    return redirect(url_for('script_detail', sid=sid))
+    db.add_script(sid, user['uid'], filename, ext[1:], sdir)
+    return jsonify({'ok': True, 'sid': sid})
 
 
-def _handle_zip(f, user):
+def _handle_zip(f, user, sid, sdir):
     tmp = tempfile.mkdtemp(prefix='zip_')
     try:
         zpath = os.path.join(tmp, 'archive.zip')
         f.save(zpath)
 
         with zipfile.ZipFile(zpath) as z:
-            # Path traversal check
-            for member in z.infolist():
-                member_path = os.path.abspath(os.path.join(tmp, member.filename))
-                if not member_path.startswith(os.path.abspath(tmp)):
-                    flash("Unsafe zip path detected", "error")
-                    return redirect(url_for('dashboard'))
+            for m in z.infolist():
+                p = os.path.abspath(os.path.join(tmp, m.filename))
+                if not p.startswith(os.path.abspath(tmp)):
+                    return jsonify({'ok': False, 'error': 'Unsafe zip path'}), 400
             z.extractall(tmp)
 
-        # Find main script
         items = os.listdir(tmp)
-
-        # If there's a single folder inside, go into it
         if len(items) == 1 and os.path.isdir(os.path.join(tmp, items[0])):
             tmp = os.path.join(tmp, items[0])
             items = os.listdir(tmp)
 
-        py_files = [x for x in items if x.endswith('.py')]
-        js_files = [x for x in items if x.endswith('.js')]
-
-        main = None
-        main_type = None
-
-        for pref in ['main.py', 'bot.py', 'app.py', 'server.py', 'run.py']:
-            if pref in py_files:
-                main, main_type = pref, 'py'
-                break
-
+        py = [x for x in items if x.endswith('.py')]
+        js = [x for x in items if x.endswith('.js')]
+        main, main_type = None, None
+        for p in ['main.py', 'bot.py', 'app.py', 'server.py', 'run.py']:
+            if p in py:
+                main, main_type = p, 'py'; break
         if not main:
-            for pref in ['index.js', 'main.js', 'bot.js', 'app.js', 'server.js']:
-                if pref in js_files:
-                    main, main_type = pref, 'js'
-                    break
-
+            for p in ['index.js', 'main.js', 'bot.js', 'app.js']:
+                if p in js:
+                    main, main_type = p, 'js'; break
         if not main:
-            if py_files:
-                main, main_type = py_files[0], 'py'
-            elif js_files:
-                main, main_type = js_files[0], 'js'
-
+            if py: main, main_type = py[0], 'py'
+            elif js: main, main_type = js[0], 'js'
         if not main:
-            flash("No .py or .js file found in zip", "error")
-            return redirect(url_for('dashboard'))
+            return jsonify({'ok': False, 'error': 'No .py or .js found'}), 400
 
-        # Security scan all files
-        for root, _, files in os.walk(tmp):
-            for fn in files:
-                if fn.endswith(('.py', '.js', '.sh')):
-                    try:
-                        with open(os.path.join(root, fn), 'r', encoding='utf-8', errors='ignore') as fh:
-                            ok, pattern = scan_code(fh.read())
-                            if not ok:
-                                flash(f"Security: {fn} contains dangerous pattern ({pattern})", "error")
-                                return redirect(url_for('dashboard'))
-                    except Exception:
-                        pass
-
-        sid = db.add_script(user['id'], main, main_type)
-        sdir = runner.get_script_dir(user['id'], sid)
-
-        # Move all files
+        # Move files
         for item in os.listdir(tmp):
             src = os.path.join(tmp, item)
             dst = os.path.join(sdir, item)
-            if os.path.isdir(dst):
-                shutil.rmtree(dst)
-            elif os.path.exists(dst):
-                os.remove(dst)
+            if os.path.isdir(dst): shutil.rmtree(dst)
+            elif os.path.exists(dst): os.remove(dst)
             shutil.move(src, dst)
 
-                # Auto-install deps
+        # Auto install deps
         req = os.path.join(sdir, 'requirements.txt')
-        pkg = os.path.join(sdir, 'package.json')
-
         if os.path.exists(req):
             try:
-                r = subprocess.run(
-                    [sys.executable, '-m', 'pip', 'install', '--no-cache-dir', '-r', req],
-                    cwd=sdir, capture_output=True, text=True,
-                    encoding='utf-8', errors='ignore', timeout=300
-                )
-                print(f"[REQ] pip install rc={r.returncode}")
-                if r.returncode != 0:
-                    print(f"[REQ] STDERR: {r.stderr[:500]}")
-            except Exception as e:
-                print(f"[REQ] Error installing requirements: {e}")
+                subprocess.run([sys.executable, '-m', 'pip', 'install',
+                                '--no-cache-dir', '-r', req],
+                               cwd=sdir, capture_output=True, timeout=300)
+            except Exception:
+                pass
 
-        if os.path.exists(pkg):
-            try:
-                r = subprocess.run(
-                    ['npm', 'install'], cwd=sdir,
-                    capture_output=True, text=True,
-                    encoding='utf-8', errors='ignore', timeout=300
-                )
-                print(f"[NPM] install rc={r.returncode}")
-            except Exception as e:
-                print(f"[NPM] Error: {e}")
-
-        flash(f"Uploaded zip. Main script: {main}. Click Start.", "success")
-        return redirect(url_for('script_detail', sid=sid))
-
-    except zipfile.BadZipFile:
-        flash("Invalid zip file", "error")
-        return redirect(url_for('dashboard'))
-    except Exception as e:
-        flash(f"Error processing zip: {str(e)}", "error")
-        return redirect(url_for('dashboard'))
+        db.add_script(sid, user['uid'], main, main_type, sdir)
+        return jsonify({'ok': True, 'sid': sid})
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-@app.route('/script/<int:sid>')
+@app.route('/api/script/<sid>/start', methods=['POST'])
 @login_required
-def script_detail(sid):
+def api_start(sid):
     user = current_user()
     s = db.get_script(sid)
-
     if not s:
-        abort(404)
-    if s['user_id'] != user['id'] and not user['is_admin']:
-        abort(403)
-
-    status = runner.get_status(sid)
-    return render_template('script.html', user=user, script=s, status=status)
-
-
-@app.route('/script/<int:sid>/start', methods=['POST'])
-@login_required
-def script_start(sid):
-    user = current_user()
-    s = db.get_script(sid)
-
-    if not s:
-        abort(404)
-    if s['user_id'] != user['id'] and not user['is_admin']:
-        abort(403)
+        return jsonify({'ok': False, 'error': 'Not found'}), 404
+    if s['user_id'] != user['uid'] and not user.get('is_admin'):
+        return jsonify({'ok': False, 'error': 'Forbidden'}), 403
 
     sdir = runner.get_script_dir(s['user_id'], sid)
     fpath = os.path.join(sdir, s['name'])
-
     if not os.path.exists(fpath):
-        flash("Script file missing", "error")
-        return redirect(url_for('script_detail', sid=sid))
+        return jsonify({'ok': False, 'error': 'File missing'}), 400
 
     ok, msg = runner.start_script(sid, s['user_id'], fpath, s['type'])
-    flash(msg, "success" if ok else "error")
-    return redirect(url_for('script_detail', sid=sid))
+    if ok:
+        db.update_script(sid, {'running': True})
+    return jsonify({'ok': ok, 'message': msg})
 
 
-@app.route('/script/<int:sid>/stop', methods=['POST'])
+@app.route('/api/script/<sid>/stop', methods=['POST'])
 @login_required
-def script_stop(sid):
+def api_stop(sid):
     user = current_user()
     s = db.get_script(sid)
-
     if not s:
-        abort(404)
-    if s['user_id'] != user['id'] and not user['is_admin']:
-        abort(403)
+        return jsonify({'ok': False, 'error': 'Not found'}), 404
+    if s['user_id'] != user['uid'] and not user.get('is_admin'):
+        return jsonify({'ok': False, 'error': 'Forbidden'}), 403
 
     ok, msg = runner.stop_script(sid)
-    flash(msg, "success" if ok else "error")
-    return redirect(url_for('script_detail', sid=sid))
+    if ok:
+        db.update_script(sid, {'running': False})
+    return jsonify({'ok': ok, 'message': msg})
 
 
-@app.route('/script/<int:sid>/restart', methods=['POST'])
+@app.route('/api/script/<sid>/logs')
 @login_required
-def script_restart(sid):
+def api_logs(sid):
     user = current_user()
     s = db.get_script(sid)
-
     if not s:
-        abort(404)
-    if s['user_id'] != user['id'] and not user['is_admin']:
-        abort(403)
+        return jsonify({'ok': False}), 404
+    if s['user_id'] != user['uid'] and not user.get('is_admin'):
+        return jsonify({'ok': False}), 403
 
-    runner.stop_script(sid)
-    sdir = runner.get_script_dir(s['user_id'], sid)
-    fpath = os.path.join(sdir, s['name'])
-
-    ok, msg = runner.start_script(sid, s['user_id'], fpath, s['type'])
-    flash(msg, "success" if ok else "error")
-    return redirect(url_for('script_detail', sid=sid))
+    log = runner.read_log(sid, s['user_id'])
+    status = runner.get_status(sid)
+    return jsonify({'ok': True, 'log': log, 'status': status})
 
 
-@app.route('/script/<int:sid>/delete', methods=['POST'])
+@app.route('/api/script/<sid>/delete', methods=['POST'])
 @login_required
-def script_delete(sid):
+def api_delete(sid):
     user = current_user()
     s = db.get_script(sid)
-
     if not s:
-        abort(404)
-    if s['user_id'] != user['id'] and not user['is_admin']:
-        abort(403)
+        return jsonify({'ok': False}), 404
+    if s['user_id'] != user['uid'] and not user.get('is_admin'):
+        return jsonify({'ok': False}), 403
 
     runner.stop_script(sid)
     sdir = runner.get_script_dir(s['user_id'], sid)
     shutil.rmtree(sdir, ignore_errors=True)
     db.delete_script(sid)
-
-    flash("Script deleted", "success")
-    return redirect(url_for('dashboard'))
+    return jsonify({'ok': True})
 
 
-@app.route('/script/<int:sid>/logs')
-@login_required
-def script_logs(sid):
+# --- Public pages ---
+@app.route('/pricing')
+def pricing():
     user = current_user()
-    s = db.get_script(sid)
-
-    if not s:
-        abort(404)
-    if s['user_id'] != user['id'] and not user['is_admin']:
-        abort(403)
-
-    log = runner.read_log(sid, s['user_id'])
-    status = runner.get_status(sid)
-    return jsonify({'log': log, 'status': status})
+    settings = db.get_settings()
+    return render_template('pricing.html', user=user, settings=settings)
 
 
-@app.route('/script/<int:sid>/logs/download')
-@login_required
-def script_logs_download(sid):
+@app.route('/docs')
+def docs():
     user = current_user()
-    s = db.get_script(sid)
-
-    if not s:
-        abort(404)
-    if s['user_id'] != user['id'] and not user['is_admin']:
-        abort(403)
-
-    sdir = runner.get_script_dir(s['user_id'], sid)
-    log_path = os.path.join(sdir, 'output.log')
-
-    if not os.path.exists(log_path):
-        abort(404)
-
-    return send_file(log_path, as_attachment=True,
-                     download_name=f'script_{sid}.log')
+    return render_template('docs.html', user=user)
 
 
-# --- Admin ---
+@app.route('/support')
+def support():
+    user = current_user()
+    return render_template('support.html', user=user)
+
+
+@app.route('/payment-history')
+@login_required
+def payment_history():
+    user = current_user()
+    payments = db.list_payments(user['uid'])
+    return render_template('payment_history.html', user=user, payments=payments)
+
+
+# ========== ADMIN ==========
+
 @app.route('/admin')
 @admin_required
-def admin():
+def admin_dashboard():
+    user = current_user()
     users = db.list_users()
-    user_list = []
+    scripts = db.list_scripts()
 
+    # Augment
     for u in users:
-        cnt = db.count_scripts(u['id'])
-        running = sum(1 for s in db.list_scripts(u['id']) if runner.is_running(s['id']))
-        user_list.append({'user': u, 'file_count': cnt, 'running': running})
+        u['script_count'] = db.count_scripts(u['uid'])
+    for s in scripts:
+        s['status'] = runner.get_status(s['id'])
+        s['running'] = s['status'].get('running', False)
 
-    return render_template('admin.html', user=current_user(),
-                           users=user_list, total_running=len(runner.RUNNING))
+    return render_template('admin.html',
+                           user=user,
+                           users=users,
+                           scripts=scripts,
+                           running_count=sum(1 for s in scripts if s['running']))
 
 
-@app.route('/admin/user/<int:uid>/limit', methods=['POST'])
+@app.route('/admin/user/<uid>/limit', methods=['POST'])
 @admin_required
 def admin_set_limit(uid):
     try:
         limit = int(request.form.get('limit', 2))
-        if limit < 0:
-            raise ValueError
-        db.update_user_limit(uid, limit)
+        db.set_user_limit(uid, limit)
         flash(f"Limit set to {limit}", "success")
-    except Exception:
-        flash("Invalid limit", "error")
-    return redirect(url_for('admin'))
+    except Exception as e:
+        flash(f"Error: {e}", "error")
+    return redirect(url_for('admin_dashboard'))
 
 
-@app.route('/admin/user/<int:uid>/delete', methods=['POST'])
+@app.route('/admin/user/<uid>/plan', methods=['POST'])
+@admin_required
+def admin_set_plan(uid):
+    plan = request.form.get('plan', 'free')
+    db.set_user_plan(uid, plan)
+    flash(f"Plan set to {plan}", "success")
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/user/<uid>/admin', methods=['POST'])
+@admin_required
+def admin_toggle_admin(uid):
+    val = request.form.get('is_admin') == '1'
+    db.make_admin(uid, val)
+    flash(f"Admin status: {val}", "success")
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/user/<uid>/delete', methods=['POST'])
 @admin_required
 def admin_delete_user(uid):
-    if uid == current_user()['id']:
+    if uid == current_user()['uid']:
         flash("Can't delete yourself", "error")
-        return redirect(url_for('admin'))
-
+        return redirect(url_for('admin_dashboard'))
     for s in db.list_scripts(uid):
         runner.stop_script(s['id'])
-
+    shutil.rmtree(os.path.join(UPLOAD_DIR, uid), ignore_errors=True)
     db.delete_user(uid)
-    shutil.rmtree(os.path.join(UPLOAD_DIR, str(uid)), ignore_errors=True)
-
     flash("User deleted", "success")
-    return redirect(url_for('admin'))
+    return redirect(url_for('admin_dashboard'))
 
 
-# --- CLI: make-admin ---
-def ensure_admin():
-    """Run: python app.py make-admin <username>"""
-    if len(sys.argv) >= 3 and sys.argv[1] == 'make-admin':
-        uname = sys.argv[2]
-        u = db.get_user_by_username(uname)
-        if not u:
-            print(f"No user '{uname}'")
-            sys.exit(1)
-
-        conn = db.get_db()
-        conn.execute('UPDATE users SET is_admin=1 WHERE id=?', (u['id'],))
-        conn.commit()
-        conn.close()
-
-        print(f"✅ '{uname}' is now admin")
-        sys.exit(0)
+@app.route('/admin/payments')
+@admin_required
+def admin_payments():
+    user = current_user()
+    payments = db.list_payments()
+    users = {u['uid']: u for u in db.list_users()}
+    return render_template('admin_payments.html',
+                           user=user, payments=payments, users=users)
 
 
-# --- Cleanup on exit ---
-import atexit
-atexit.register(runner.cleanup_all)
+@app.route('/admin/payment/add', methods=['POST'])
+@admin_required
+def admin_add_payment():
+    try:
+        user_id = request.form['user_id']
+        amount = request.form['amount']
+        method = request.form.get('method', 'manual')
+        status = request.form.get('status', 'success')
+        note = request.form.get('note', '')
+        db.add_payment(user_id, amount, method, status, note)
+        flash("Payment added", "success")
+    except Exception as e:
+        flash(f"Error: {e}", "error")
+    return redirect(url_for('admin_payments'))
 
 
-# --- Main ---
+@app.route('/admin/script/<sid>/start', methods=['POST'])
+@admin_required
+def admin_start(sid):
+    s = db.get_script(sid)
+    if not s:
+        return jsonify({'ok': False}), 404
+    sdir = runner.get_script_dir(s['user_id'], sid)
+    fpath = os.path.join(sdir, s['name'])
+    if not os.path.exists(fpath):
+        return jsonify({'ok': False, 'error': 'File missing'}), 400
+    ok, msg = runner.start_script(sid, s['user_id'], fpath, s['type'])
+    return jsonify({'ok': ok, 'message': msg})
+
+
+@app.route('/admin/script/<sid>/stop', methods=['POST'])
+@admin_required
+def admin_stop(sid):
+    ok, msg = runner.stop_script(sid)
+    return jsonify({'ok': ok, 'message': msg})
+
+
 if __name__ == '__main__':
-    ensure_admin()
     port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 Starting PyHost on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
