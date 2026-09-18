@@ -285,25 +285,33 @@ def _handle_zip(f, user):
                 os.remove(dst)
             shutil.move(src, dst)
 
-        # Auto-install deps
+                # Auto-install deps
         req = os.path.join(sdir, 'requirements.txt')
         pkg = os.path.join(sdir, 'package.json')
 
         if os.path.exists(req):
             try:
-                subprocess.run(
-                    [sys.executable, '-m', 'pip', 'install', '-r', req],
-                    cwd=sdir, capture_output=True, timeout=300
+                r = subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', '--no-cache-dir', '-r', req],
+                    cwd=sdir, capture_output=True, text=True,
+                    encoding='utf-8', errors='ignore', timeout=300
                 )
-            except Exception:
-                pass
+                print(f"[REQ] pip install rc={r.returncode}")
+                if r.returncode != 0:
+                    print(f"[REQ] STDERR: {r.stderr[:500]}")
+            except Exception as e:
+                print(f"[REQ] Error installing requirements: {e}")
 
         if os.path.exists(pkg):
             try:
-                subprocess.run(['npm', 'install'], cwd=sdir,
-                               capture_output=True, timeout=300)
-            except Exception:
-                pass
+                r = subprocess.run(
+                    ['npm', 'install'], cwd=sdir,
+                    capture_output=True, text=True,
+                    encoding='utf-8', errors='ignore', timeout=300
+                )
+                print(f"[NPM] install rc={r.returncode}")
+            except Exception as e:
+                print(f"[NPM] Error: {e}")
 
         flash(f"Uploaded zip. Main script: {main}. Click Start.", "success")
         return redirect(url_for('script_detail', sid=sid))
