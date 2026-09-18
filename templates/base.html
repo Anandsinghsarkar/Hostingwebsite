@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050810">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>{% block title %}A7 Hosting{% endblock %} — A7 HOSTING</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -17,25 +20,13 @@
         <div class="logo-text">A7 HOSTING</div>
     </a>
     <div class="nav-links">
-        <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
-            🏠 Home
-        </a>
-        <a href="{{ url_for('my_bots') }}" class="nav-link {% if request.endpoint == 'my_bots' %}active{% endif %}">
-            🤖 My Bots
-        </a>
-        <a href="{{ url_for('pricing') }}" class="nav-link {% if request.endpoint == 'pricing' %}active{% endif %}">
-            💎 Pricing
-        </a>
-        <a href="{{ url_for('docs') }}" class="nav-link {% if request.endpoint == 'docs' %}active{% endif %}">
-            📖 Docs
-        </a>
-        <a href="{{ url_for('support') }}" class="nav-link {% if request.endpoint == 'support' %}active{% endif %}">
-            💬 Support
-        </a>
+        <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">🏠 Home</a>
+        <a href="{{ url_for('my_bots') }}" class="nav-link {% if request.endpoint == 'my_bots' %}active{% endif %}">🤖 My Bots</a>
+        <a href="{{ url_for('pricing') }}" class="nav-link {% if request.endpoint == 'pricing' %}active{% endif %}">💎 Pricing</a>
+        <a href="{{ url_for('docs') }}" class="nav-link {% if request.endpoint == 'docs' %}active{% endif %}">📖 Docs</a>
+        <a href="{{ url_for('support') }}" class="nav-link {% if request.endpoint == 'support' %}active{% endif %}">💬 Support</a>
     </div>
     <div class="user-area">
-        <button class="icon-btn" title="Theme">🌙</button>
-        <button class="icon-btn" title="Notifications">🔔</button>
         {% if user %}
         <div class="user-chip">
             {% if user.picture %}
@@ -55,35 +46,19 @@
 
 <!-- ============ LAYOUT ============ -->
 <div class="layout">
-    <!-- Sidebar -->
+    <!-- Sidebar (desktop only) -->
     <aside class="sidebar">
         <div class="side-menu">
-            <a href="{{ url_for('dashboard') }}" class="side-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                🏠 Dashboard
-            </a>
-            <a href="{{ url_for('my_bots') }}" class="side-link {% if request.endpoint == 'my_bots' %}active{% endif %}">
-                🤖 My Bots
-            </a>
-            <a href="{{ url_for('pricing') }}" class="side-link">
-                🛒 Bot Store
-            </a>
-            <a href="{{ url_for('create_bot') }}" class="side-link {% if request.endpoint == 'create_bot' %}active{% endif %}">
-                ➕ Create Bot
-            </a>
-            <a href="{{ url_for('payment_history') }}" class="side-link {% if request.endpoint == 'payment_history' %}active{% endif %}">
-                💳 Payment History
-            </a>
-            <a href="{{ url_for('support') }}" class="side-link">
-                💬 Support
-            </a>
+            <a href="{{ url_for('dashboard') }}" class="side-link {% if request.endpoint == 'dashboard' %}active{% endif %}">🏠 Dashboard</a>
+            <a href="{{ url_for('my_bots') }}" class="side-link {% if request.endpoint == 'my_bots' %}active{% endif %}">🤖 My Bots</a>
+            <a href="{{ url_for('pricing') }}" class="side-link {% if request.endpoint == 'pricing' %}active{% endif %}">🛒 Bot Store</a>
+            <a href="{{ url_for('create_bot') }}" class="side-link {% if request.endpoint == 'create_bot' %}active{% endif %}">➕ Create Bot</a>
+            <a href="{{ url_for('payment_history') }}" class="side-link {% if request.endpoint == 'payment_history' %}active{% endif %}">💳 Payment History</a>
+            <a href="{{ url_for('support') }}" class="side-link {% if request.endpoint == 'support' %}active{% endif %}">💬 Support</a>
             {% if user and user.is_admin %}
             <div style="margin: 12px 0 4px; padding: 8px 14px; font-size: 10.5px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 1px;">Admin</div>
-            <a href="{{ url_for('admin_dashboard') }}" class="side-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
-                👑 Admin Panel
-            </a>
-            <a href="{{ url_for('admin_payments') }}" class="side-link {% if request.endpoint == 'admin_payments' %}active{% endif %}">
-                💰 Payments
-            </a>
+            <a href="{{ url_for('admin_dashboard') }}" class="side-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">👑 Admin Panel</a>
+            <a href="{{ url_for('admin_payments') }}" class="side-link {% if request.endpoint == 'admin_payments' %}active{% endif %}">💰 Payments</a>
             {% endif %}
         </div>
 
@@ -104,6 +79,39 @@
         {% block content %}{% endblock %}
     </main>
 </div>
+
+<!-- ============ BOTTOM NAVIGATION (mobile only) ============ -->
+{% if user %}
+<nav class="bottomnav">
+    <a href="{{ url_for('dashboard') }}" class="bottomnav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+        <span class="bn-icon">🏠</span>
+        <span class="bn-label">Home</span>
+    </a>
+    <a href="{{ url_for('my_bots') }}" class="bottomnav-link {% if request.endpoint == 'my_bots' %}active{% endif %}">
+        <span class="bn-icon">🤖</span>
+        <span class="bn-label">Bots</span>
+    </a>
+    <a href="{{ url_for('create_bot') }}" class="bottomnav-link bn-center {% if request.endpoint == 'create_bot' %}active{% endif %}">
+        <span class="bn-icon">+</span>
+        <span class="bn-label">Create</span>
+    </a>
+    <a href="{{ url_for('pricing') }}" class="bottomnav-link {% if request.endpoint == 'pricing' %}active{% endif %}">
+        <span class="bn-icon">💎</span>
+        <span class="bn-label">Pricing</span>
+    </a>
+    {% if user.is_admin %}
+    <a href="{{ url_for('admin_dashboard') }}" class="bottomnav-link {% if request.endpoint in ['admin_dashboard','admin_payments'] %}active{% endif %}">
+        <span class="bn-icon">👑</span>
+        <span class="bn-label">Admin</span>
+    </a>
+    {% else %}
+    <a href="{{ url_for('support') }}" class="bottomnav-link {% if request.endpoint == 'support' %}active{% endif %}">
+        <span class="bn-icon">💬</span>
+        <span class="bn-label">Support</span>
+    </a>
+    {% endif %}
+</nav>
+{% endif %}
 
 <!-- ============ Firebase Client SDK ============ -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
