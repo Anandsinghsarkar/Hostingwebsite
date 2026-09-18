@@ -2,12 +2,101 @@
 {% block title %}Admin Payments{% endblock %}
 
 {% block content %}
-<h1 class="page-title">💰 Payment Management</h1>
+<h1 class="page-title">💰 Payment &amp; Pricing Management</h1>
 
+<!-- ========== PRICING & QR SETTINGS ========== -->
 <div class="card mb-3">
-    <div class="card-header"><h3>➕ Add Payment</h3></div>
+    <div class="card-header"><h3>⚙️ Pricing Settings</h3></div>
+    <form method="post" action="{{ url_for('admin_update_pricing') }}" enctype="multipart/form-data">
+
+        <h4 style="margin: 12px 0 8px; color: var(--text-dim); font-size: 13px;">📱 PAYMENT INFO</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+                <label>UPI ID</label>
+                <input type="text" name="upi_id" value="{{ settings.upi_id }}" placeholder="example@upi">
+            </div>
+            <div>
+                <label>UPI Holder Name</label>
+                <input type="text" name="upi_name" value="{{ settings.upi_name }}" placeholder="A7 Hosting">
+            </div>
+        </div>
+
+        <div style="margin-top: 12px;">
+            <label>QR Code Image</label>
+            {% if settings.qr_code_url %}
+                <div style="margin-bottom: 10px;">
+                    <img src="{{ settings.qr_code_url }}" style="max-width: 180px; border-radius: 10px; border: 1px solid var(--border);">
+                </div>
+            {% endif %}
+            <input type="file" name="qr_image" accept="image/*">
+            <small class="muted">Naya QR upload karne pe purana replace ho jayega.</small>
+        </div>
+
+        <h4 style="margin: 20px 0 8px; color: var(--text-dim); font-size: 13px;">💎 PLAN PRICING</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+            <div>
+                <label>Free Plan - Bots</label>
+                <input type="number" name="free_bots" value="{{ settings.pricing.free.bots }}" min="0">
+            </div>
+            <div>
+                <label>Premium Price (₹)</label>
+                <input type="number" name="premium_price" value="{{ settings.pricing.premium.price }}" min="0">
+            </div>
+            <div>
+                <label>Premium Bots</label>
+                <input type="number" name="premium_bots" value="{{ settings.pricing.premium.bots }}" min="0">
+            </div>
+            <div>
+                <label>Premium Days</label>
+                <input type="number" name="premium_days" value="{{ settings.pricing.premium.days }}" min="1">
+            </div>
+            <div>
+                <label>Business Price (₹)</label>
+                <input type="number" name="business_price" value="{{ settings.pricing.business.price }}" min="0">
+            </div>
+            <div>
+                <label>Business Bots</label>
+                <input type="number" name="business_bots" value="{{ settings.pricing.business.bots }}" min="0">
+            </div>
+            <div>
+                <label>Business Days</label>
+                <input type="number" name="business_days" value="{{ settings.pricing.business.days }}" min="1">
+            </div>
+            <div>
+                <label>Per Extra Bot (₹)</label>
+                <input type="number" name="per_bot_price" value="{{ settings.per_bot_price }}" min="0">
+            </div>
+            <div>
+                <label>Free Price (₹) - usually 0</label>
+                <input type="number" name="free_price" value="{{ settings.pricing.free.price }}" min="0">
+            </div>
+        </div>
+
+        <h4 style="margin: 20px 0 8px; color: var(--text-dim); font-size: 13px;">📢 OFFER &amp; SUPPORT</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+                <label>Offer Text</label>
+                <input type="text" name="offer_text" value="{{ settings.offer_text }}">
+            </div>
+            <div>
+                <label>Support Contact</label>
+                <input type="text" name="support_contact" value="{{ settings.support_contact }}">
+            </div>
+        </div>
+        <div style="margin-top: 12px;">
+            <label>Payment Note</label>
+            <textarea name="payment_note" rows="2">{{ settings.payment_note }}</textarea>
+        </div>
+
+        <button class="btn btn-primary" style="margin-top: 16px;">💾 Save Settings</button>
+    </form>
+</div>
+
+<!-- ========== ADD PAYMENT ========== -->
+<div class="card mb-3">
+    <div class="card-header"><h3>➕ Add Payment Manually</h3></div>
     <form method="post" action="{{ url_for('admin_add_payment') }}" class="row" style="align-items:end;">
-        <div style="flex:1;min-width:180px;">
+        <div style="flex:2;min-width:180px;">
             <label>User</label>
             <select name="user_id" required>
                 <option value="">Select user...</option>
@@ -41,10 +130,11 @@
             <label>Note</label>
             <input name="note" type="text" placeholder="Optional">
         </div>
-        <button class="btn btn-primary">Add Payment</button>
+        <button class="btn btn-primary">Add</button>
     </form>
 </div>
 
+<!-- ========== ALL PAYMENTS ========== -->
 <div class="card">
     <div class="card-header"><h3>📊 All Payments</h3></div>
     {% if payments %}
@@ -56,7 +146,7 @@
                 <th>Amount</th>
                 <th>Method</th>
                 <th>Status</th>
-                <th>Note</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -74,15 +164,19 @@
                 <td><strong>₹{{ '%.2f'|format(p.amount) }}</strong></td>
                 <td><span class="badge badge-off">{{ p.method }}</span></td>
                 <td>
-                    {% if p.status == 'success' %}
-                        <span class="badge badge-on">✅ Success</span>
-                    {% elif p.status == 'pending' %}
-                        <span class="badge" style="background:rgba(251,191,36,.12);color:var(--gold);">⏳ Pending</span>
-                    {% else %}
-                        <span class="badge" style="background:rgba(239,68,68,.12);color:#fca5a5;">❌ Failed</span>
-                    {% endif %}
+                    {% if p.status == 'success' %}<span class="badge badge-on">✅</span>
+                    {% elif p.status == 'pending' %}<span class="badge" style="background:rgba(251,191,36,.12);color:var(--gold);">⏳</span>
+                    {% else %}<span class="badge" style="background:rgba(239,68,68,.12);color:#fca5a5;">❌</span>{% endif %}
                 </td>
-                <td class="muted small">{{ p.note }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin_payment_status', pid=p.id) }}" style="display:inline;">
+                        <select name="status" onchange="this.form.submit()" style="padding:4px 8px;font-size:11px;">
+                            <option value="success" {{ 'selected' if p.status=='success' }}>✅ Success</option>
+                            <option value="pending" {{ 'selected' if p.status=='pending' }}>⏳ Pending</option>
+                            <option value="failed" {{ 'selected' if p.status=='failed' }}>❌ Failed</option>
+                        </select>
+                    </form>
+                </td>
             </tr>
         {% endfor %}
         </tbody>
