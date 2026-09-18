@@ -1,188 +1,76 @@
 # -*- coding: utf-8 -*-
 """
-Firestore database helpers.
-Collections:
-  users/{uid}          → {email, name, picture, is_admin, file_limit, plan, created_at}
-  scripts/{sid}        → {user_id, name, type, running, created_at, storage_path}
-  payments/{pid}       → {user_id, amount, method, status, note, created_at}
-  settings/global      → {pricing: {...}, offers: [...]}
+Firebase Admin SDK initialization.
+Koi bhi cheez is file me import NAHI karo — ye base file hai.
 """
-from datetime import datetime
-from firebase_config import get_db
+import os
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+KEY_PATH = os.environ.get('FIREBASE_KEY_PATH',
+                          os.path.join(BASE_DIR, 'firebase-key.json'))
+
+_db = None
+_bucket = None
+_initialized = False
 
 
-def _now():
-    return datetime.utcnow().isoformat()
+def init_firebase():
+    """Initialize Firebase once. Safe to call multiple times."""
+    global _db, _bucket, _initialized
 
+    if _initialized:
+        return _db, _bucket
 
-# --- USERS ---
-def get_user(uid):
-    db = get_db()
-    doc = db.collection('users').document(uid).get()
-    return doc.to_dict() if doc.exists else None
+    # --- Load credentials ---
+    key_json = os.environ.get('FIREBASE_KEY_JSON')
 
-
-def create_or_update_user(uid, email, name, picture=''):
-    db = get_db()
-    ref = db.collection('users').document(uid)
-    existing = ref.get()
-    data = {
-        'email': email,
-        'name': name,
-        'picture': picture,
-        'last_login': _now(),
-    }
-    if not existing.exists:
-        data.update({
-            'is_admin': False,
-            'file_limit': 2,
-            'plan': 'free',
-            'created_at': _now(),
-        })
-        ref.set(data)
+    if key_json:
+        try:
+            cred_dict = json.loads(key_json)
+            cred = credentials.Certificate(cred_dict)
+        except Exception as e:
+            raise RuntimeError(f"Invalid FIREBASE_KEY_JSON: {e}")
+    elif os.path.exists(KEY_PATH):
+        cred = credentials.Certificate(KEY_PATH)
     else:
-        ref.update(data)
-    return ref.get().to_dict()
+        raise RuntimeError(
+            "Firebase key not found. Set FIREBASE_KEY_JSON env var "
+            "or place firebase-key.json in project root."
+        )
+
+    bucket_name = os.environ.get('FIREBASE_STORAGE_BUCKET', '')
+
+    # Avoid double-init
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred, {
+            'storageBucket': bucket_name
+        })
+
+    _db = firestore.client()
+
+    try:
+        _bucket = storage.bucket()
+    except Exception as e:
+        print(f"⚠️ Storage bucket not available: {e}")
+        _bucket = None
+
+    _initialized = True
+    print("✅ Firebase initialized")
+    return _db, _bucket
 
 
-def list_users(limit=200):
-    db = get_db()
-    users = []
-    for doc in db.collection('users').limit(limit).stream():
-        d = doc.to_dict()
-        d['uid'] = doc.id
-        users.append(d)
-    return users
+def get_db():
+    """Get Firestore client. Auto-init if needed."""
+    if not _initialized:
+        init_firebase()
+    return _db
 
 
-def update_user(uid, data):
-    db = get_db()
-    db.collection('users').document(uid).update(data)
-
-
-def set_user_limit(uid, limit):
-    update_user(uid, {'file_limit': int(limit)})
-
-
-def set_user_plan(uid, plan):
-    update_user(uid, {'plan': plan})
-
-
-def make_admin(uid, is_admin=True):
-    update_user(uid, {'is_admin': bool(is_admin)})
-
-
-def delete_user(uid):
-    db = get_db()
-    # delete scripts
-    for doc in db.collection('scripts').where('user_id', '==', uid).stream():
-        doc.reference.delete()
-    db.collection('users').document(uid).delete()
-
-
-def count_users():
-    db = get_db()
-    return len(list(db.collection('users').stream()))
-
-
-# --- SCRIPTS ---
-def add_script(sid, user_id, name, stype, storage_path):
-    db = get_db()
-    db.collection('scripts').document(sid).set({
-        'user_id': user_id,
-        'name': name,
-        'type': stype,
-        'running': False,
-        'storage_path': storage_path,
-        'created_at': _now(),
-    })
-    return sid
-
-
-def get_script(sid):
-    db = get_db()
-    doc = db.collection('scripts').document(sid).get()
-    if doc.exists:
-        d = doc.to_dict()
-        d['id'] = doc.id
-        return d
-    return None
-
-
-def list_scripts(user_id=None):
-    db = get_db()
-    q = db.collection('scripts')
-    if user_id:
-        q = q.where('user_id', '==', user_id)
-    items = []
-    for doc in q.stream():
-        d = doc.to_dict()
-        d['id'] = doc.id
-        items.append(d)
-    # sort by created_at desc
-    items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-    return items
-
-
-def update_script(sid, data):
-    db = get_db()
-    db.collection('scripts').document(sid).update(data)
-
-
-def delete_script(sid):
-    db = get_db()
-    db.collection('scripts').document(sid).delete()
-
-
-def count_scripts(user_id):
-    return len(list_scripts(user_id))
-
-
-# --- PAYMENTS ---
-def add_payment(user_id, amount, method, status, note=''):
-    db = get_db()
-    pid = db.collection('payments').document().id
-    db.collection('payments').document(pid).set({
-        'user_id': user_id,
-        'amount': float(amount),
-        'method': method,
-        'status': status,
-        'note': note,
-        'created_at': _now(),
-    })
-    return pid
-
-
-def list_payments(user_id=None, limit=100):
-    db = get_db()
-    q = db.collection('payments')
-    if user_id:
-        q = q.where('user_id', '==', user_id)
-    items = []
-    for doc in q.limit(limit).stream():
-        d = doc.to_dict()
-        d['id'] = doc.id
-        items.append(d)
-    items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-    return items
-
-
-# --- SETTINGS ---
-def get_settings():
-    db = get_db()
-    doc = db.collection('settings').document('global').get()
-    if doc.exists:
-        return doc.to_dict()
-    return {
-        'pricing': {
-            'free': 0,
-            'premium': 199,
-            'business': 499,
-        },
-        'offer': 'Get 50% OFF on Premium Plan',
-    }
-
-
-def update_settings(data):
-    db = get_db()
-    db.collection('settings').document('global').set(data, merge=True)
+def get_bucket():
+    """Get Firebase Storage bucket."""
+    if not _initialized:
+        init_firebase()
+    return _bucket
