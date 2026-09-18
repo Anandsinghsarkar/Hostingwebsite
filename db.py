@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Firestore database helpers.
-Collections: users, scripts, payments, settings, install_logs
 """
 import os
 from datetime import datetime
 from firebase_config import get_db
 
 
-# --- Admin email whitelist (Render env var se) ---
-# Example: ADMIN_EMAILS=adminanandkumar@gmail.com,other@gmail.com
 ADMIN_EMAILS = [
     e.strip().lower()
     for e in os.environ.get('ADMIN_EMAILS', '').split(',')
@@ -30,11 +27,9 @@ def get_user(uid):
 
 
 def create_or_update_user(uid, email, name, picture=''):
-    """Login pe call hota hai. Whitelist email = auto admin."""
     db = get_db()
     ref = db.collection('users').document(uid)
     existing = ref.get()
-
     is_admin_email = email.lower() in ADMIN_EMAILS
 
     data = {
@@ -49,15 +44,15 @@ def create_or_update_user(uid, email, name, picture=''):
             'is_admin': is_admin_email,
             'file_limit': 999 if is_admin_email else 2,
             'plan': 'premium' if is_admin_email else 'free',
+            'plan_expiry': None,
             'created_at': _now(),
         })
         ref.set(data)
     else:
-        # Agar email whitelist me hai aur already admin nahi hai, to promote karo
-        old_data = existing.to_dict()
-        if is_admin_email and not old_data.get('is_admin'):
+        old = existing.to_dict()
+        if is_admin_email and not old.get('is_admin'):
             data['is_admin'] = True
-            if old_data.get('file_limit', 2) < 999:
+            if old.get('file_limit', 2) < 999:
                 data['file_limit'] = 999
         ref.update(data)
 
@@ -84,8 +79,11 @@ def set_user_limit(uid, limit):
     update_user(uid, {'file_limit': int(limit)})
 
 
-def set_user_plan(uid, plan):
-    update_user(uid, {'plan': plan})
+def set_user_plan(uid, plan, days=30):
+    """Plan set + expiry set."""
+    from datetime import timedelta
+    expiry = (datetime.utcnow() + timedelta(days=days)).isoformat()
+    update_user(uid, {'plan': plan, 'plan_expiry': expiry})
 
 
 def make_admin(uid, is_admin=True):
@@ -159,7 +157,7 @@ def count_scripts(user_id):
 
 # ==================== PAYMENTS ====================
 
-def add_payment(user_id, amount, method, status, note=''):
+def add_payment(user_id, amount, method, status, note='', screenshot_url=''):
     db = get_db()
     pid = db.collection('payments').document().id
     db.collection('payments').document(pid).set({
@@ -168,6 +166,7 @@ def add_payment(user_id, amount, method, status, note=''):
         'method': method,
         'status': status,
         'note': note,
+        'screenshot_url': screenshot_url,
         'created_at': _now(),
     })
     return pid
@@ -187,17 +186,39 @@ def list_payments(user_id=None, limit=200):
     return items
 
 
-# ==================== SETTINGS ====================
+def update_payment_status(pid, status):
+    db = get_db()
+    db.collection('payments').document(pid).update({'status': status})
+
+
+# ==================== SETTINGS (PRICING + QR) ====================
+
+DEFAULT_SETTINGS = {
+    'pricing': {
+        'free': {'price': 0, 'bots': 2, 'days': 0},
+        'premium': {'price': 199, 'bots': 20, 'days': 30},
+        'business': {'price': 499, 'bots': 999, 'days': 30},
+    },
+    'per_bot_price': 49,      # ek extra bot ka price
+    'upi_id': 'a7hosting@upi',
+    'upi_name': 'A7 Hosting',
+    'qr_code_url': '',        # admin upload karega
+    'offer_text': 'Get 50% OFF on Premium Plan',
+    'support_contact': '@a7hosting',
+    'payment_note': 'Payment ke baad screenshot admin ko bhejo.',
+}
+
 
 def get_settings():
     db = get_db()
     doc = db.collection('settings').document('global').get()
     if doc.exists:
-        return doc.to_dict()
-    return {
-        'pricing': {'free': 0, 'premium': 199, 'business': 499},
-        'offer': 'Get 50% OFF on Premium Plan',
-    }
+        data = doc.to_dict()
+        # merge defaults
+        merged = dict(DEFAULT_SETTINGS)
+        merged.update(data)
+        return merged
+    return dict(DEFAULT_SETTINGS)
 
 
 def update_settings(data):
@@ -208,7 +229,6 @@ def update_settings(data):
 # ==================== INSTALL LOGS ====================
 
 def log_install(user_id, module, status, log):
-    """Installation log save karo (auto-install ka record)."""
     try:
         db = get_db()
         pid = db.collection('install_logs').document().id
