@@ -1,30 +1,123 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>{% block title %}Hosting{% endblock %} — PyHost</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}A7 Hosting{% endblock %} — A7 HOSTING</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<nav>
-    <div class="brand">⚡ PyHost</div>
-    <div class="links">
+
+<!-- ============ TOP NAV ============ -->
+<nav class="topnav">
+    <a href="{{ url_for('index') }}" class="logo">
+        <div class="logo-icon">A7</div>
+        <div class="logo-text">A7 HOSTING</div>
+    </a>
+    <div class="nav-links">
+        <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+            🏠 Home
+        </a>
+        <a href="{{ url_for('my_bots') }}" class="nav-link {% if request.endpoint == 'my_bots' %}active{% endif %}">
+            🤖 My Bots
+        </a>
+        <a href="{{ url_for('pricing') }}" class="nav-link {% if request.endpoint == 'pricing' %}active{% endif %}">
+            💎 Pricing
+        </a>
+        <a href="{{ url_for('docs') }}" class="nav-link {% if request.endpoint == 'docs' %}active{% endif %}">
+            📖 Docs
+        </a>
+        <a href="{{ url_for('support') }}" class="nav-link {% if request.endpoint == 'support' %}active{% endif %}">
+            💬 Support
+        </a>
+    </div>
+    <div class="user-area">
+        <button class="icon-btn" title="Theme">🌙</button>
+        <button class="icon-btn" title="Notifications">🔔</button>
         {% if user %}
-            <a href="{{ url_for('dashboard') }}">Dashboard</a>
-            {% if user['is_admin'] %}<a href="{{ url_for('admin') }}">Admin</a>{% endif %}
-            <span class="who">{{ user['username'] }}</span>
-            <a href="{{ url_for('logout') }}" class="btn-ghost">Logout</a>
+        <div class="user-chip">
+            {% if user.picture %}
+                <img src="{{ user.picture }}" alt="">
+            {% else %}
+                <div class="avatar">{{ user.name[0]|upper }}</div>
+            {% endif %}
+            <div class="info">
+                <div class="name">{{ user.name }}</div>
+                <div class="plan">{{ 'Premium' if user.plan == 'premium' else 'Free' }} 👑</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="icon-btn" title="Logout">🚪</a>
         {% endif %}
     </div>
 </nav>
-<main>
-    {% with msgs = get_flashed_messages(with_categories=true) %}
-        {% for cat, m in msgs %}
-            <div class="flash flash-{{ cat }}">{{ m }}</div>
-        {% endfor %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-</main>
+
+<!-- ============ LAYOUT ============ -->
+<div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="side-menu">
+            <a href="{{ url_for('dashboard') }}" class="side-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                🏠 Dashboard
+            </a>
+            <a href="{{ url_for('my_bots') }}" class="side-link {% if request.endpoint == 'my_bots' %}active{% endif %}">
+                🤖 My Bots
+            </a>
+            <a href="{{ url_for('pricing') }}" class="side-link">
+                🛒 Bot Store
+            </a>
+            <a href="{{ url_for('create_bot') }}" class="side-link {% if request.endpoint == 'create_bot' %}active{% endif %}">
+                ➕ Create Bot
+            </a>
+            <a href="{{ url_for('payment_history') }}" class="side-link {% if request.endpoint == 'payment_history' %}active{% endif %}">
+                💳 Payment History
+            </a>
+            <a href="{{ url_for('support') }}" class="side-link">
+                💬 Support
+            </a>
+            {% if user and user.is_admin %}
+            <div style="margin: 12px 0 4px; padding: 8px 14px; font-size: 10.5px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 1px;">Admin</div>
+            <a href="{{ url_for('admin_dashboard') }}" class="side-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+                👑 Admin Panel
+            </a>
+            <a href="{{ url_for('admin_payments') }}" class="side-link {% if request.endpoint == 'admin_payments' %}active{% endif %}">
+                💰 Payments
+            </a>
+            {% endif %}
+        </div>
+
+        <div class="side-card">
+            <h4>👑 Premium Plan</h4>
+            <p>More Power, More Control</p>
+            <a href="{{ url_for('pricing') }}" class="btn btn-primary btn-sm" style="width: 100%;">Upgrade Now →</a>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="content">
+        {% with msgs = get_flashed_messages(with_categories=true) %}
+            {% for cat, m in msgs %}
+                <div class="flash flash-{{ cat }}">{{ m }}</div>
+            {% endfor %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<!-- ============ Firebase Client SDK ============ -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+window.FIREBASE_CONFIG = {
+    apiKey: "{{ fb_config.apiKey }}",
+    authDomain: "{{ fb_config.authDomain }}",
+    projectId: "{{ fb_config.projectId }}",
+    storageBucket: "{{ fb_config.storageBucket }}",
+    messagingSenderId: "{{ fb_config.messagingSenderId }}",
+    appId: "{{ fb_config.appId }}"
+};
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>
