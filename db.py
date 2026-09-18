@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
 """
 Firestore database helpers.
-Collections: users, scripts, payments, settings
+Collections: users, scripts, payments, settings, install_logs
 """
+import os
 from datetime import datetime
 from firebase_config import get_db
+
+
+# --- Admin email whitelist (Render env var se) ---
+# Example: ADMIN_EMAILS=adminanandkumar@gmail.com,other@gmail.com
+ADMIN_EMAILS = [
+    e.strip().lower()
+    for e in os.environ.get('ADMIN_EMAILS', '').split(',')
+    if e.strip()
+]
 
 
 def _now():
@@ -14,17 +24,18 @@ def _now():
 # ==================== USERS ====================
 
 def get_user(uid):
-    """Get single user by UID."""
     db = get_db()
     doc = db.collection('users').document(uid).get()
     return doc.to_dict() if doc.exists else None
 
 
 def create_or_update_user(uid, email, name, picture=''):
-    """Login pe call hota hai. User exist nahi karta to create, warna update."""
+    """Login pe call hota hai. Whitelist email = auto admin."""
     db = get_db()
     ref = db.collection('users').document(uid)
     existing = ref.get()
+
+    is_admin_email = email.lower() in ADMIN_EMAILS
 
     data = {
         'email': email,
@@ -35,20 +46,25 @@ def create_or_update_user(uid, email, name, picture=''):
 
     if not existing.exists:
         data.update({
-            'is_admin': False,
-            'file_limit': 2,
-            'plan': 'free',
+            'is_admin': is_admin_email,
+            'file_limit': 999 if is_admin_email else 2,
+            'plan': 'premium' if is_admin_email else 'free',
             'created_at': _now(),
         })
         ref.set(data)
     else:
+        # Agar email whitelist me hai aur already admin nahi hai, to promote karo
+        old_data = existing.to_dict()
+        if is_admin_email and not old_data.get('is_admin'):
+            data['is_admin'] = True
+            if old_data.get('file_limit', 2) < 999:
+                data['file_limit'] = 999
         ref.update(data)
 
     return ref.get().to_dict()
 
 
 def list_users(limit=500):
-    """List all users (admin panel ke liye)."""
     db = get_db()
     users = []
     for doc in db.collection('users').limit(limit).stream():
@@ -77,12 +93,9 @@ def make_admin(uid, is_admin=True):
 
 
 def delete_user(uid):
-    """Delete user + all their scripts."""
     db = get_db()
-    # Delete all scripts of user
     for doc in db.collection('scripts').where('user_id', '==', uid).stream():
         doc.reference.delete()
-    # Delete user
     db.collection('users').document(uid).delete()
 
 
@@ -94,7 +107,6 @@ def count_users():
 # ==================== SCRIPTS ====================
 
 def add_script(sid, user_id, name, stype, storage_path=''):
-    """Add new script record."""
     db = get_db()
     db.collection('scripts').document(sid).set({
         'user_id': user_id,
@@ -118,7 +130,6 @@ def get_script(sid):
 
 
 def list_scripts(user_id=None):
-    """List scripts. If user_id given, filter by user."""
     db = get_db()
     q = db.collection('scripts')
     if user_id:
@@ -192,3 +203,21 @@ def get_settings():
 def update_settings(data):
     db = get_db()
     db.collection('settings').document('global').set(data, merge=True)
+
+
+# ==================== INSTALL LOGS ====================
+
+def log_install(user_id, module, status, log):
+    """Installation log save karo (auto-install ka record)."""
+    try:
+        db = get_db()
+        pid = db.collection('install_logs').document().id
+        db.collection('install_logs').document(pid).set({
+            'user_id': user_id,
+            'module': module,
+            'status': status,
+            'log': (log or '')[:2000],
+            'created_at': _now(),
+        })
+    except Exception as e:
+        print(f"⚠️ log_install failed: {e}")
