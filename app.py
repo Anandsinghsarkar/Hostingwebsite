@@ -74,22 +74,14 @@ def admin_required(f):
     return w
 
 
-# --- Security ---
-DANGEROUS = [
-    r'rm\s+-rf\s+/',
-    r'\bos\.system\s*\(',
-    r'\bos\.popen\s*\(',
-    r'subprocess\.(Popen|call|run)\s*\([^)]*shell\s*=\s*True',
-    r'\bctypes\b',
-    r'__import__\s*\(\s*[\'"]os[\'"]\s*\)',
-    r'shutil\.rmtree\s*\(\s*[\'"]/',
-]
+# --- Security (DISABLED — any .py file allowed) ---
+# NOTE: Production me safety ke liye Docker isolation lagana chahiye.
+# Filhaal scan disable hai taaki koi bhi valid script host ho jaye.
+DANGEROUS = []  # Empty list → kuch block nahi hoga
 
 
 def scan_code(text):
-    for pat in DANGEROUS:
-        if re.search(pat, text):
-            return False, pat
+    """Security scan disabled. Always passes."""
     return True, None
 
 
